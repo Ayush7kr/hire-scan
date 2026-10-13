@@ -76,6 +76,11 @@ class TestRegistration(models.Model):
         Candidate, on_delete=models.CASCADE, related_name='registrations'
     )
     test = models.ForeignKey(Test, on_delete=models.CASCADE, related_name='registrations')
+    status = models.CharField(
+        max_length=20,
+        choices=[('registered', 'Registered'), ('cancelled', 'Cancelled')],
+        default='registered'
+    )
     registered_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

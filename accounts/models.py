@@ -40,6 +40,7 @@ class Candidate(models.Model):
     qualification = models.CharField(max_length=100, blank=True, default='')
     passing_year = models.IntegerField(null=True, blank=True)
     other_details = models.TextField(blank=True, default='')
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

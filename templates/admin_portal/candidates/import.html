@@ -1,0 +1,265 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Import Candidates CSV — HireScan Admin{% endblock %}
+
+{% block navbar %}
+<header>
+  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+    <div class="container-fluid px-lg-4">
+      <a class="hs-brand" href="{% url 'admin_dashboard' %}">
+        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+        HireScan <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-6 ms-1">Admin</span>
+      </a>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <span class="small text-muted d-none d-md-inline">Signed in as <strong>{{ request.admin_user.name }}</strong></span>
+        <a href="{% url 'admin_logout' %}" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+      </div>
+    </div>
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex admin-layout-wrapper">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-heading">Navigation</div>
+    <nav class="d-flex flex-column">
+      <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </a>
+      <a href="{% url 'candidate_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-people"></i> Candidates
+      </a>
+      <a href="{% url 'candidate_import' %}" class="sidebar-nav-item active">
+        <i class="bi bi-file-earmark-arrow-up"></i> Candidate Imports
+      </a>
+      <a href="{% url 'test_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-journal-text"></i> Tests
+      </a>
+      <a href="{% url 'registration_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-card-checklist"></i> Test Registrations
+      </a>
+      <div class="sidebar-heading mt-3">System</div>
+      <a href="{% url 'admin_logout' %}" class="sidebar-nav-item text-danger">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="admin-content">
+    <div class="container-fluid px-0">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb small mb-2">
+          <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'candidate_list' %}" class="text-decoration-none">Candidates</a></li>
+          <li class="breadcrumb-item active" aria-current="page">CSV Import</li>
+        </ol>
+      </nav>
+
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 class="fw-bold mb-0">Import Candidates Roster</h2>
+          <p class="text-muted small mb-0">Upload a CSV file to batch onboard candidates and register them for an assessment.</p>
+        </div>
+        <div>
+          <a href="{% url 'candidate_template_download' %}" class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-1">
+            <i class="bi bi-file-earmark-arrow-down"></i> Download CSV Template
+          </a>
+        </div>
+      </div>
+
+      <!-- Import Summary Alert Card (if just processed) -->
+      {% if summary %}
+        <div class="card border-0 shadow-sm rounded-3 mb-4 border-start border-4 border-primary">
+          <div class="card-body p-4">
+            <h5 class="fw-bold mb-3"><i class="bi bi-clipboard-data text-primary me-2"></i>Import Summary for "{{ summary.test_name }}"</h5>
+            <div class="row g-3 text-center">
+              <div class="col-sm-2 col-4">
+                <div class="p-2 bg-light rounded">
+                  <div class="text-muted small">Total Rows</div>
+                  <div class="fs-4 fw-bold">{{ summary.total_rows }}</div>
+                </div>
+              </div>
+              <div class="col-sm-2 col-4">
+                <div class="p-2 bg-success-subtle text-success rounded">
+                  <div class="small">Created</div>
+                  <div class="fs-4 fw-bold">{{ summary.candidates_created }}</div>
+                </div>
+              </div>
+              <div class="col-sm-2 col-4">
+                <div class="p-2 bg-info-subtle text-info rounded">
+                  <div class="small">Reused</div>
+                  <div class="fs-4 fw-bold">{{ summary.candidates_reused }}</div>
+                </div>
+              </div>
+              <div class="col-sm-2 col-4">
+                <div class="p-2 bg-primary-subtle text-primary rounded">
+                  <div class="small">Registered</div>
+                  <div class="fs-4 fw-bold">{{ summary.registrations_created }}</div>
+                </div>
+              </div>
+              <div class="col-sm-2 col-4">
+                <div class="p-2 bg-warning-subtle text-warning rounded">
+                  <div class="small">Duplicate Reg.</div>
+                  <div class="fs-4 fw-bold">{{ summary.duplicates_skipped }}</div>
+                </div>
+              </div>
+              <div class="col-sm-2 col-4">
+                <div class="p-2 bg-danger-subtle text-danger rounded">
+                  <div class="small">Invalid Rows</div>
+                  <div class="fs-4 fw-bold">{{ summary.invalid_rows }}</div>
+                </div>
+              </div>
+            </div>
+
+            {% if summary.invalid_rows > 0 %}
+              <div class="mt-4 pt-3 border-top d-flex justify-content-between align-items-center">
+                <div class="text-danger small fw-semibold">
+                  <i class="bi bi-exclamation-circle me-1"></i> {{ summary.invalid_rows }} row(s) could not be processed due to validation errors.
+                </div>
+                <a href="{% url 'candidate_import_error_csv' %}" class="btn btn-outline-danger btn-sm">
+                  <i class="bi bi-download me-1"></i> Download Failed Rows Error CSV
+                </a>
+              </div>
+
+              <!-- Inline Error Preview Table -->
+              <div class="table-responsive mt-3">
+                <table class="table table-sm table-bordered small">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width: 80px;">Row #</th>
+                      <th>Email</th>
+                      <th>Name</th>
+                      <th>Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for err in summary.errors|slice:":10" %}
+                      <tr>
+                        <td class="font-mono text-center">{{ err.row }}</td>
+                        <td>{{ err.email }}</td>
+                        <td>{{ err.name }}</td>
+                        <td class="text-danger">{{ err.reason }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                {% if summary.errors|length > 10 %}
+                  <div class="text-muted small text-center">... and {{ summary.errors|length|add:"-10" }} more errors. Download CSV for full details.</div>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="row g-4">
+        <!-- Import Upload Form -->
+        <div class="col-lg-7">
+          <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-header bg-white border-bottom py-3">
+              <h5 class="fw-bold mb-0"><i class="bi bi-cloud-arrow-up text-primary me-2"></i>Upload File</h5>
+            </div>
+            <div class="card-body p-4">
+              <form method="POST" action="{% url 'candidate_import' %}" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+
+                <!-- Target Assessment Selection -->
+                <div class="mb-3">
+                  <label for="importTestSelect" class="form-label">Associate With Assessment <span class="text-danger">*</span></label>
+                  <select class="form-select" id="importTestSelect" name="test_id" required>
+                    <option value="">— Select Target Test —</option>
+                    {% for test in tests %}
+                      <option value="{{ test.test_id }}">{{ test.test_name }} ({{ test.duration_minutes }}m &bull; {{ test.total_questions }} Qs)</option>
+                    {% endfor %}
+                  </select>
+                  <div class="form-text small">All imported candidates will be registered for the selected test.</div>
+                </div>
+
+                <!-- CSV File Upload -->
+                <div class="mb-4">
+                  <label for="importCsvFile" class="form-label">Select CSV Roster File <span class="text-danger">*</span></label>
+                  <input type="file" class="form-control" id="importCsvFile" name="csv_file" accept=".csv" required>
+                  <div class="form-text small">Maximum file size: 5MB. Must be standard CSV format.</div>
+                </div>
+
+                <button type="submit" class="btn btn-hs-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2">
+                  <i class="bi bi-upload"></i> Process & Import Candidate Roster
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Instructions & Column Guidelines -->
+        <div class="col-lg-5">
+          <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-header bg-white border-bottom py-3">
+              <h5 class="fw-bold mb-0"><i class="bi bi-info-circle text-primary me-2"></i>Expected CSV Format</h5>
+            </div>
+            <div class="card-body p-4 small">
+              <p class="text-muted mb-3">
+                Ensure your CSV file contains the following column headers in the first row:
+              </p>
+
+              <div class="table-responsive">
+                <table class="table table-bordered table-sm mb-3">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Column Header</th>
+                      <th>Requirement</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><code>email</code></td>
+                      <td><span class="badge bg-danger-subtle text-danger">Mandatory</span> Unique valid email</td>
+                    </tr>
+                    <tr>
+                      <td><code>name</code></td>
+                      <td><span class="badge bg-danger-subtle text-danger">Mandatory</span> Candidate full name</td>
+                    </tr>
+                    <tr>
+                      <td><code>whatsapp_number</code></td>
+                      <td><span class="badge bg-secondary-subtle text-secondary">Optional</span> Phone digits</td>
+                    </tr>
+                    <tr>
+                      <td><code>college_name_address</code></td>
+                      <td><span class="badge bg-secondary-subtle text-secondary">Optional</span> College or address</td>
+                    </tr>
+                    <tr>
+                      <td><code>qualification</code></td>
+                      <td><span class="badge bg-secondary-subtle text-secondary">Optional</span> Degree or branch</td>
+                    </tr>
+                    <tr>
+                      <td><code>passing_year</code></td>
+                      <td><span class="badge bg-secondary-subtle text-secondary">Optional</span> 4-digit year (e.g. 2025)</td>
+                    </tr>
+                    <tr>
+                      <td><code>other</code></td>
+                      <td><span class="badge bg-secondary-subtle text-secondary">Optional</span> Role or notes</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="alert alert-light border py-2 px-3 mb-0">
+                <strong class="text-dark d-block mb-1">Duplicate Policy:</strong>
+                <ul class="mb-0 ps-3 text-muted">
+                  <li>Existing candidate records are matched by email and reused without overwriting historical info.</li>
+                  <li>Duplicate registrations for the same test are automatically skipped.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

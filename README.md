@@ -14,8 +14,8 @@ HireScan is a secure, maintainable, production-ready web application built to st
   - **Candidate:** Passwordless cryptographically secure email OTP verification with attempt limiting and cooldown
 - **Architecture Pattern:** Modular Django applications with separation of concerns:
   - `accounts/`: Authentication, sessions, OTP verification, activity auditing, role decorators
-  - `candidates/`: Candidate profiles, CSV roster imports, eligibility checks
-  - `assessments/`: Tests, question banks, candidate-to-test registrations
+  - `candidates/`: Candidate profiles, CSV roster imports, eligibility checks, activation toggling
+  - `assessments/`: Tests, question banks (4-option MCQs with topic/difficulty), sufficiency rules, registrations
   - `attempts/`: Test attempts, timer management, autosave responses, server-side scoring
   - `analytics/`: Administrator metrics, pass/fail calculations, reporting
 
@@ -41,14 +41,14 @@ The data layer strictly models the approved ER specifications:
 | Entity | Primary Key | Description & Integrity Rules |
 | :--- | :--- | :--- |
 | `Admin` | `admin_id` (UUID) | System administrator accounts with unique email and hashed password. |
-| `Candidate` | `candidate_id` (UUID) | Examinee records created via admin CSV import with unique email. |
-| `Test` | `test_id` (UUID) | Test configurations with duration, question count, and passing threshold. |
+| `Candidate` | `candidate_id` (UUID) | Examinee records created via admin CSV import with unique email and `is_active` flag. |
+| `Test` | `test_id` (UUID) | Test configurations with duration, question count, passing threshold, and `is_active` status. |
 | `Question` | `question_id` (UUID) | 4-option MCQs belonging to a test bank with topic, difficulty, and suggestions. |
-| `TestRegistration` | `registration_id` (UUID) | Links Candidate to Test. Enforces `UNIQUE(candidate, test)`. |
+| `TestRegistration` | `registration_id` (UUID) | Links Candidate to Test with `status` ('registered'/'cancelled'). Enforces `UNIQUE(candidate, test)`. |
 | `TestAttempt` | `attempt_id` (UUID) | Single attempt per registration via `OneToOneField`. Tracks score and status. |
 | `AttemptQuestion` | `aq_id` (UUID) | Assigned question subset per attempt. Enforces `UNIQUE(attempt, question)`. |
 | `OTPVerification` | `otp_id` (UUID) | Candidate OTP records with PBKDF2 hash, 5-minute expiry, and max 3 attempts. |
-| `ActivityLog` | `activity_id` (UUID) | Audit log for logins, OTP issuances, tests, and administrative actions. |
+| `ActivityLog` | `activity_id` (UUID) | Audit log for logins, candidate imports, tests, and administrative actions. |
 
 ---
 
@@ -98,7 +98,7 @@ python manage.py migrate
 
 ## 5. Provisioning an Administrator Account
 
-Administrator accounts cannot be registered publicly. To create your first administrator:
+Administrator accounts cannot be registered publicly. To create an administrator:
 
 ```bash
 python manage.py create_admin --email admin@hirescan.local --name "HireScan Administrator" --password "YourStrongPassword123!"
@@ -121,39 +121,58 @@ Open your browser and navigate to:
 - **Public Homepage:** `http://127.0.0.1:8000/`
 - **Administrator Login:** `http://127.0.0.1:8000/admin/login/`
 - **Administrator Dashboard:** `http://127.0.0.1:8000/admin/dashboard/`
+- **Candidate Roster:** `http://127.0.0.1:8000/admin/candidates/`
+- **Candidate CSV Import:** `http://127.0.0.1:8000/admin/candidates/import/`
+- **Assessment Tests:** `http://127.0.0.1:8000/admin/tests/`
+- **Test Registrations:** `http://127.0.0.1:8000/admin/registrations/`
 - **Candidate Login:** `http://127.0.0.1:8000/candidate/login/`
 - **Candidate Assessment Portal:** `http://127.0.0.1:8000/test/dashboard/`
 
-> **Note on Candidate Login during Local Testing:**
-> When requesting an OTP for a candidate email in local development, check your terminal running `runserver`. Django's console email backend will print the 6-digit OTP code directly to stdout.
+---
+
+## 7. CSV Formats Supported
+
+### Candidate Roster CSV Format
+Headers:
+```csv
+email,name,whatsapp_number,college_name_address,qualification,passing_year,other
+```
+Example:
+```csv
+john.doe@example.com,John Doe,9876543210,Apex University,B.Tech CS,2025,Software Engineer Applicant
+```
+
+### Question Bank CSV Format
+Headers:
+```csv
+question,option1,option2,option3,option4,correct_option,topic,difficulty,suggestions
+```
+Example:
+```csv
+What is the output of print(type([])) in Python 3?,<class 'list'>,<class 'tuple'>,<class 'array'>,<class 'dict'>,1,Data Types,easy,Review standard container types.
+```
+*Note: `correct_option` accepts `1`, `2`, `3`, `4` or `A`, `B`, `C`, `D` (normalized automatically).*
 
 ---
 
-## 7. Running the Automated Test Suite
+## 8. Running the Automated Test Suite
 
-HireScan includes comprehensive automated tests validating routes, authentication, database constraints, and session isolation.
+HireScan includes a comprehensive automated test suite covering authentication, route authorization, database constraints, candidate imports, question bank sufficiency, and registration rules.
 
 Execute the test suite:
 ```bash
 python manage.py test
 ```
 
-Sample test output:
+Current test results:
 ```
-Found 20 test(s).
-Creating test database for alias 'default'...
-System check identified no issues (0 silenced).
-....................
-----------------------------------------------------------------------
-Ran 20 tests in 6.416s
-
+Ran 48 tests in 22.182s
 OK
-Destroying test database for alias 'default'...
 ```
 
 ---
 
-## 8. Development Roadmap
+## 9. Development Status & Roadmap
 
 - [x] **Phase 1: Foundation (Completed)**
   - Workspace inspection & approved specification synthesis
@@ -164,19 +183,26 @@ Destroying test database for alias 'default'...
   - Candidate passwordless OTP email authentication (hashed OTP, 5-minute expiry, cooldown)
   - Role-based access control decorators (`@admin_required`, `@candidate_required`)
   - Admin CLI provisioning command (`create_admin`)
-  - Automated test suite with 20 passing unit/integration tests
-- [ ] **Phase 2: Administration**
-  - Candidate CSV batch roster imports with field validation & duplicate checks
-  - Assessment configuration (duration, passing marks, question count)
-  - Question bank CSV parser with MCQ validation
-  - Candidate-to-test registration management
+  - 20 unit/integration tests passing
+- [x] **Phase 2: Administration Module (Completed)**
+  - Candidate roster management (list, search, pagination, detail, edit, activate/deactivate)
+  - Candidate CSV batch roster imports with field validation, duplicate detection, and downloadable error reports
+  - Test management (create, edit, duration/question validation, historical attempt protection)
+  - Test activation rules strictly enforced (cannot activate test if bank < total questions)
+  - Question bank management (manual add, edit, delete with auto-deactivation safeguard)
+  - Question bank CSV import with 4-option validation, normalization (1-4 and A-D), and downloadable error reports
+  - Candidate-to-test registration management with `UNIQUE(candidate, test)` duplicate protection
+  - Registration cancellation with completed attempt protection
+  - Complete integration into the Administrator Dashboard with live metrics
+  - 28 new automated tests (48 tests passing in total)
 - [ ] **Phase 3: Assessment Engine**
-  - Randomized question subset generator
+  - Randomized question subset generator per candidate attempt
   - Timed test execution interface with autosave and backend timestamp enforcement
   - Resilient submission and server-side evaluation engine
+  - Instant scorecard and topic-wise performance breakdown
 - [ ] **Phase 4: Analytics & Reporting**
   - Topic-wise accuracy computation
-  - Pass/fail analytics & top scorers
+  - Pass/fail distributions & top performers
   - CSV and PDF scorecard export
 - [ ] **Phase 5: Production Deployment & Hardening**
   - PostgreSQL adapter configuration

@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Edit Question — {{ test.test_name }}{% endblock %}
+
+{% block navbar %}
+<header>
+  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+    <div class="container-fluid px-lg-4">
+      <a class="hs-brand" href="{% url 'admin_dashboard' %}">
+        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+        HireScan <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-6 ms-1">Admin</span>
+      </a>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <span class="small text-muted d-none d-md-inline">Signed in as <strong>{{ request.admin_user.name }}</strong></span>
+        <a href="{% url 'admin_logout' %}" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+      </div>
+    </div>
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex admin-layout-wrapper">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-heading">Navigation</div>
+    <nav class="d-flex flex-column">
+      <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </a>
+      <a href="{% url 'candidate_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-people"></i> Candidates
+      </a>
+      <a href="{% url 'candidate_import' %}" class="sidebar-nav-item">
+        <i class="bi bi-file-earmark-arrow-up"></i> Candidate Imports
+      </a>
+      <a href="{% url 'test_list' %}" class="sidebar-nav-item active">
+        <i class="bi bi-journal-text"></i> Tests
+      </a>
+      <a href="{% url 'registration_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-card-checklist"></i> Test Registrations
+      </a>
+      <div class="sidebar-heading mt-3">System</div>
+      <a href="{% url 'admin_logout' %}" class="sidebar-nav-item text-danger">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="admin-content">
+    <div class="container-fluid px-0">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb small mb-2">
+          <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'test_list' %}" class="text-decoration-none">Tests</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'question_list' test_id=test.test_id %}" class="text-decoration-none">Question Bank</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Edit Question</li>
+        </ol>
+      </nav>
+
+      <div class="row justify-content-center">
+        <div class="col-lg-9">
+          <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-header bg-white border-bottom py-3">
+              <h5 class="fw-bold mb-0">
+                <i class="bi bi-pencil-square text-primary me-2"></i>Edit Question
+              </h5>
+            </div>
+            <div class="card-body p-4">
+              <form method="POST" action="{% url 'question_edit' test_id=test.test_id question_id=question.question_id %}" novalidate>
+                {% csrf_token %}
+
+                <!-- Question Text -->
+                <div class="mb-3">
+                  <label for="qText" class="form-label">Question Text <span class="text-danger">*</span></label>
+                  <textarea 
+                    class="form-control {% if errors.question_text %}is-invalid{% endif %}" 
+                    id="qText" 
+                    name="question_text" 
+                    rows="3" 
+                    required
+                  >{{ request.POST.question_text|default:question.question_text }}</textarea>
+                  {% if errors.question_text %}
+                    <div class="invalid-feedback">{{ errors.question_text }}</div>
+                  {% endif %}
+                </div>
+
+                <!-- 4 Options -->
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label for="qOpt1" class="form-label">Option 1 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control {% if errors.option1 %}is-invalid{% endif %}" id="qOpt1" name="option1" value="{{ request.POST.option1|default:question.option1 }}" required>
+                    {% if errors.option1 %}<div class="invalid-feedback">{{ errors.option1 }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-6">
+                    <label for="qOpt2" class="form-label">Option 2 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control {% if errors.option2 %}is-invalid{% endif %}" id="qOpt2" name="option2" value="{{ request.POST.option2|default:question.option2 }}" required>
+                    {% if errors.option2 %}<div class="invalid-feedback">{{ errors.option2 }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-6">
+                    <label for="qOpt3" class="form-label">Option 3 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control {% if errors.option3 %}is-invalid{% endif %}" id="qOpt3" name="option3" value="{{ request.POST.option3|default:question.option3 }}" required>
+                    {% if errors.option3 %}<div class="invalid-feedback">{{ errors.option3 }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-6">
+                    <label for="qOpt4" class="form-label">Option 4 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control {% if errors.option4 %}is-invalid{% endif %}" id="qOpt4" name="option4" value="{{ request.POST.option4|default:question.option4 }}" required>
+                    {% if errors.option4 %}<div class="invalid-feedback">{{ errors.option4 }}</div>{% endif %}
+                  </div>
+                </div>
+
+                <!-- Correct Option, Topic, Difficulty -->
+                <div class="row g-3 mb-3">
+                  <div class="col-md-4">
+                    <label for="qCorrect" class="form-label">Correct Option <span class="text-danger">*</span></label>
+                    <select class="form-select {% if errors.correct_option %}is-invalid{% endif %}" id="qCorrect" name="correct_option" required>
+                      <option value="1" {% if request.POST.correct_option == '1' or question.correct_option == 1 %}selected{% endif %}>Option 1</option>
+                      <option value="2" {% if request.POST.correct_option == '2' or question.correct_option == 2 %}selected{% endif %}>Option 2</option>
+                      <option value="3" {% if request.POST.correct_option == '3' or question.correct_option == 3 %}selected{% endif %}>Option 3</option>
+                      <option value="4" {% if request.POST.correct_option == '4' or question.correct_option == 4 %}selected{% endif %}>Option 4</option>
+                    </select>
+                    {% if errors.correct_option %}<div class="invalid-feedback">{{ errors.correct_option }}</div>{% endif %}
+                  </div>
+
+                  <div class="col-md-4">
+                    <label for="qTopic" class="form-label">Topic / Category <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control {% if errors.topic %}is-invalid{% endif %}" id="qTopic" name="topic" value="{{ request.POST.topic|default:question.topic }}" required>
+                    {% if errors.topic %}<div class="invalid-feedback">{{ errors.topic }}</div>{% endif %}
+                  </div>
+
+                  <div class="col-md-4">
+                    <label for="qDifficulty" class="form-label">Difficulty Level</label>
+                    <select class="form-select" id="qDifficulty" name="difficulty">
+                      <option value="easy" {% if request.POST.difficulty == 'easy' or question.difficulty == 'easy' %}selected{% endif %}>Easy</option>
+                      <option value="medium" {% if request.POST.difficulty == 'medium' or question.difficulty == 'medium' %}selected{% endif %}>Medium</option>
+                      <option value="hard" {% if request.POST.difficulty == 'hard' or question.difficulty == 'hard' %}selected{% endif %}>Hard</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Suggestions -->
+                <div class="mb-4">
+                  <label for="qSuggestions" class="form-label">Improvement Suggestions</label>
+                  <textarea class="form-control" id="qSuggestions" name="suggestions" rows="2">{{ request.POST.suggestions|default:question.suggestions }}</textarea>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                  <a href="{% url 'question_list' test_id=test.test_id %}" class="btn btn-outline-secondary">Cancel</a>
+                  <button type="submit" class="btn btn-hs-primary">
+                    <i class="bi bi-check2 me-1"></i> Update Question
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

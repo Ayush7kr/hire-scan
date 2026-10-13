@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Register Candidate for Test — HireScan Admin{% endblock %}
+
+{% block navbar %}
+<header>
+  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+    <div class="container-fluid px-lg-4">
+      <a class="hs-brand" href="{% url 'admin_dashboard' %}">
+        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+        HireScan <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-6 ms-1">Admin</span>
+      </a>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <span class="small text-muted d-none d-md-inline">Signed in as <strong>{{ request.admin_user.name }}</strong></span>
+        <a href="{% url 'admin_logout' %}" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+      </div>
+    </div>
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex admin-layout-wrapper">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-heading">Navigation</div>
+    <nav class="d-flex flex-column">
+      <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </a>
+      <a href="{% url 'candidate_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-people"></i> Candidates
+      </a>
+      <a href="{% url 'candidate_import' %}" class="sidebar-nav-item">
+        <i class="bi bi-file-earmark-arrow-up"></i> Candidate Imports
+      </a>
+      <a href="{% url 'test_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-journal-text"></i> Tests
+      </a>
+      <a href="{% url 'registration_list' %}" class="sidebar-nav-item active">
+        <i class="bi bi-card-checklist"></i> Test Registrations
+      </a>
+      <div class="sidebar-heading mt-3">System</div>
+      <a href="{% url 'admin_logout' %}" class="sidebar-nav-item text-danger">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="admin-content">
+    <div class="container-fluid px-0">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb small mb-2">
+          <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'registration_list' %}" class="text-decoration-none">Registrations</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Register Candidate</li>
+        </ol>
+      </nav>
+
+      <div class="row justify-content-center">
+        <div class="col-lg-7">
+          <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-header bg-white border-bottom py-3">
+              <h5 class="fw-bold mb-0"><i class="bi bi-person-plus text-primary me-2"></i>Register Candidate for Assessment</h5>
+            </div>
+            <div class="card-body p-4">
+              {% if errors.general %}
+                <div class="alert alert-danger py-2 small d-flex align-items-center mb-3">
+                  <i class="bi bi-exclamation-triangle-fill fs-5 me-2"></i>
+                  <div>{{ errors.general }}</div>
+                </div>
+              {% endif %}
+
+              <form method="POST" action="{% url 'registration_create' %}" novalidate>
+                {% csrf_token %}
+
+                <!-- Candidate Selection -->
+                <div class="mb-3">
+                  <label for="candSelect" class="form-label">Select Candidate <span class="text-danger">*</span></label>
+                  <select class="form-select {% if errors.candidate_id %}is-invalid{% endif %}" id="candSelect" name="candidate_id" required>
+                    <option value="">— Choose Registered Candidate —</option>
+                    {% for c in candidates %}
+                      <option value="{{ c.candidate_id }}" {% if request.POST.candidate_id == c.candidate_id|stringformat:"s" %}selected{% endif %}>
+                        {{ c.name }} ({{ c.email }})
+                      </option>
+                    {% endfor %}
+                  </select>
+                  {% if errors.candidate_id %}
+                    <div class="invalid-feedback">{{ errors.candidate_id }}</div>
+                  {% endif %}
+                </div>
+
+                <!-- Test Selection -->
+                <div class="mb-4">
+                  <label for="testSelect" class="form-label">Select Assessment Test <span class="text-danger">*</span></label>
+                  <select class="form-select {% if errors.test_id %}is-invalid{% endif %}" id="testSelect" name="test_id" required>
+                    <option value="">— Choose Target Test —</option>
+                    {% for t in tests %}
+                      <option value="{{ t.test_id }}" {% if request.POST.test_id == t.test_id|stringformat:"s" %}selected{% endif %}>
+                        {{ t.test_name }} ({{ t.duration_minutes }}m &bull; {{ t.total_questions }} Qs)
+                      </option>
+                    {% endfor %}
+                  </select>
+                  {% if errors.test_id %}
+                    <div class="invalid-feedback">{{ errors.test_id }}</div>
+                  {% endif %}
+                </div>
+
+                <div class="alert alert-light border py-2 px-3 small text-muted mb-4">
+                  <i class="bi bi-shield-lock me-1"></i>
+                  <strong>Constraint Enforcement:</strong> Candidates cannot be registered more than once for the same test. Attempt records are strictly linked 1:1 to unique registrations.
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                  <a href="{% url 'registration_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                  <button type="submit" class="btn btn-hs-primary">
+                    <i class="bi bi-check2 me-1"></i> Complete Registration
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Candidate Management — HireScan Admin{% endblock %}
+
+{% block navbar %}
+<header>
+  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+    <div class="container-fluid px-lg-4">
+      <a class="hs-brand" href="{% url 'admin_dashboard' %}">
+        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+        HireScan <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-6 ms-1">Admin</span>
+      </a>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <span class="small text-muted d-none d-md-inline">Signed in as <strong>{{ request.admin_user.name }}</strong></span>
+        <a href="{% url 'admin_logout' %}" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+      </div>
+    </div>
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex admin-layout-wrapper">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-heading">Navigation</div>
+    <nav class="d-flex flex-column">
+      <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </a>
+      <a href="{% url 'candidate_list' %}" class="sidebar-nav-item active">
+        <i class="bi bi-people"></i> Candidates
+      </a>
+      <a href="{% url 'candidate_import' %}" class="sidebar-nav-item">
+        <i class="bi bi-file-earmark-arrow-up"></i> Candidate Imports
+      </a>
+      <a href="{% url 'test_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-journal-text"></i> Tests
+      </a>
+      <a href="{% url 'registration_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-card-checklist"></i> Test Registrations
+      </a>
+      <div class="sidebar-heading mt-3">System</div>
+      <a href="{% url 'admin_logout' %}" class="sidebar-nav-item text-danger">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="admin-content">
+    <div class="container-fluid px-0">
+      <!-- Page Header -->
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+        <div>
+          <nav aria-label="breadcrumb">
+            <ol class="breadcrumb small mb-1">
+              <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+              <li class="breadcrumb-item active" aria-current="page">Candidates</li>
+            </ol>
+          </nav>
+          <h2 class="fw-bold mb-0">Candidate Roster</h2>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{% url 'candidate_import' %}" class="btn btn-hs-primary btn-sm d-inline-flex align-items-center gap-1">
+            <i class="bi bi-upload"></i> Import Candidates CSV
+          </a>
+        </div>
+      </div>
+
+      <!-- Search & Filter Card -->
+      <div class="card border-0 shadow-sm rounded-3 mb-4">
+        <div class="card-body p-3">
+          <form method="GET" action="{% url 'candidate_list' %}" class="row g-2 align-items-center">
+            <div class="col-md-9">
+              <div class="input-group">
+                <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                <input 
+                  type="text" 
+                  name="q" 
+                  class="form-control" 
+                  placeholder="Search candidates by name or email address..." 
+                  value="{{ search_query }}"
+                >
+              </div>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+              <button type="submit" class="btn btn-hs-primary w-100">Search</button>
+              {% if search_query %}
+                <a href="{% url 'candidate_list' %}" class="btn btn-outline-secondary">Reset</a>
+              {% endif %}
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Candidate Table -->
+      <div class="card border-0 shadow-sm rounded-3">
+        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+          <h5 class="fw-bold mb-0">
+            <i class="bi bi-people text-primary me-2"></i>Candidates List
+            <span class="badge bg-light text-muted border ms-2">{{ total_count }} Total</span>
+          </h5>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0 table-custom border-0">
+            <thead>
+              <tr>
+                <th>Candidate</th>
+                <th>Contact</th>
+                <th>Education</th>
+                <th>Status</th>
+                <th>Registrations</th>
+                <th>Added Date</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if page_obj %}
+                {% for cand in page_obj %}
+                  <tr>
+                    <td>
+                      <strong>{{ cand.name }}</strong>
+                      <div class="small text-muted font-mono">{{ cand.email }}</div>
+                    </td>
+                    <td>
+                      {% if cand.whatsapp_number %}
+                        <span class="small"><i class="bi bi-whatsapp text-success me-1"></i>{{ cand.whatsapp_number }}</span>
+                      {% else %}
+                        <span class="text-muted small">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if cand.qualification %}
+                        <div>{{ cand.qualification }}</div>
+                        <div class="small text-muted">{{ cand.passing_year|default:"—" }}</div>
+                      {% else %}
+                        <span class="text-muted small">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if cand.is_active %}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                      {% else %}
+                        <span class="badge bg-secondary-subtle text-secondary border">Deactivated</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                        {{ cand.reg_count }} Test(s)
+                      </span>
+                    </td>
+                    <td class="small text-muted">
+                      {{ cand.created_at|date:"M d, Y" }}
+                    </td>
+                    <td class="text-end">
+                      <div class="btn-group btn-group-sm">
+                        <a href="{% url 'candidate_detail' candidate_id=cand.candidate_id %}" class="btn btn-outline-primary" title="View Candidate Profile">
+                          <i class="bi bi-eye"></i>
+                        </a>
+                        <a href="{% url 'candidate_edit' candidate_id=cand.candidate_id %}" class="btn btn-outline-secondary" title="Edit Candidate">
+                          <i class="bi bi-pencil"></i>
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="7" class="text-center py-5 text-muted">
+                    <i class="bi bi-people fs-2 d-block mb-2 text-secondary"></i>
+                    {% if search_query %}
+                      No candidates found matching "<strong>{{ search_query }}</strong>".
+                    {% else %}
+                      No candidates found in the system. Use the <strong>Import Candidates CSV</strong> button to onboard candidates.
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+          <div class="card-footer bg-white border-top py-3 d-flex justify-content-between align-items-center">
+            <div class="small text-muted">
+              Showing page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            </div>
+            <nav aria-label="Page navigation">
+              <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">Previous</a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled"><span class="page-link">Previous</span></li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                  {% if page_obj.number == num %}
+                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                  {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <li class="page-item">
+                      <a class="page-link" href="?page={{ num }}{% if search_query %}&q={{ search_query }}{% endif %}">{{ num }}</a>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">Next</a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled"><span class="page-link">Next</span></li>
+                {% endif %}
+              </ul>
+            </nav>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

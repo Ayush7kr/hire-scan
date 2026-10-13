@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Edit {{ test.test_name }} — HireScan Admin{% endblock %}
+
+{% block navbar %}
+<header>
+  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+    <div class="container-fluid px-lg-4">
+      <a class="hs-brand" href="{% url 'admin_dashboard' %}">
+        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+        HireScan <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-6 ms-1">Admin</span>
+      </a>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <span class="small text-muted d-none d-md-inline">Signed in as <strong>{{ request.admin_user.name }}</strong></span>
+        <a href="{% url 'admin_logout' %}" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+      </div>
+    </div>
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex admin-layout-wrapper">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-heading">Navigation</div>
+    <nav class="d-flex flex-column">
+      <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </a>
+      <a href="{% url 'candidate_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-people"></i> Candidates
+      </a>
+      <a href="{% url 'candidate_import' %}" class="sidebar-nav-item">
+        <i class="bi bi-file-earmark-arrow-up"></i> Candidate Imports
+      </a>
+      <a href="{% url 'test_list' %}" class="sidebar-nav-item active">
+        <i class="bi bi-journal-text"></i> Tests
+      </a>
+      <a href="{% url 'registration_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-card-checklist"></i> Test Registrations
+      </a>
+      <div class="sidebar-heading mt-3">System</div>
+      <a href="{% url 'admin_logout' %}" class="sidebar-nav-item text-danger">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="admin-content">
+    <div class="container-fluid px-0">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb small mb-2">
+          <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'test_list' %}" class="text-decoration-none">Tests</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'test_detail' test_id=test.test_id %}" class="text-decoration-none">{{ test.test_name }}</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Edit</li>
+        </ol>
+      </nav>
+
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          {% if attempt_count > 0 %}
+            <div class="alert alert-warning py-2 px-3 small d-flex align-items-center mb-3">
+              <i class="bi bi-exclamation-triangle-fill fs-5 me-2"></i>
+              <div>
+                <strong>Historical Protection:</strong> This test already has <strong>{{ attempt_count }}</strong> candidate attempt(s). Modifying question counts or duration will affect future attempts; existing completed scores will remain preserved.
+              </div>
+            </div>
+          {% endif %}
+
+          <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-header bg-white border-bottom py-3">
+              <h5 class="fw-bold mb-0"><i class="bi bi-pencil-square text-primary me-2"></i>Edit Test Configuration</h5>
+            </div>
+            <div class="card-body p-4">
+              <form method="POST" action="{% url 'test_edit' test_id=test.test_id %}" novalidate>
+                {% csrf_token %}
+
+                <!-- Test Name -->
+                <div class="mb-3">
+                  <label for="testName" class="form-label">Test Title <span class="text-danger">*</span></label>
+                  <input 
+                    type="text" 
+                    class="form-control {% if errors.test_name %}is-invalid{% endif %}" 
+                    id="testName" 
+                    name="test_name" 
+                    value="{{ request.POST.test_name|default:test.test_name }}" 
+                    required
+                  >
+                  {% if errors.test_name %}
+                    <div class="invalid-feedback">{{ errors.test_name }}</div>
+                  {% endif %}
+                </div>
+
+                <!-- Description -->
+                <div class="mb-3">
+                  <label for="testDesc" class="form-label">Description & Instructions</label>
+                  <textarea 
+                    class="form-control" 
+                    id="testDesc" 
+                    name="description" 
+                    rows="3"
+                  >{{ request.POST.description|default:test.description }}</textarea>
+                </div>
+
+                <!-- Duration, Total Qs, Passing Marks -->
+                <div class="row g-3 mb-4">
+                  <div class="col-md-4">
+                    <label for="testDuration" class="form-label">Duration (Minutes) <span class="text-danger">*</span></label>
+                    <input 
+                      type="number" 
+                      class="form-control {% if errors.duration_minutes %}is-invalid{% endif %}" 
+                      id="testDuration" 
+                      name="duration_minutes" 
+                      min="1" 
+                      value="{{ request.POST.duration_minutes|default:test.duration_minutes }}" 
+                      required
+                    >
+                    {% if errors.duration_minutes %}
+                      <div class="text-danger small mt-1">{{ errors.duration_minutes }}</div>
+                    {% endif %}
+                  </div>
+
+                  <div class="col-md-4">
+                    <label for="testQuestions" class="form-label">Questions Per Attempt <span class="text-danger">*</span></label>
+                    <input 
+                      type="number" 
+                      class="form-control {% if errors.total_questions %}is-invalid{% endif %}" 
+                      id="testQuestions" 
+                      name="total_questions" 
+                      min="1" 
+                      value="{{ request.POST.total_questions|default:test.total_questions }}" 
+                      required
+                    >
+                    {% if errors.total_questions %}
+                      <div class="text-danger small mt-1">{{ errors.total_questions }}</div>
+                    {% endif %}
+                  </div>
+
+                  <div class="col-md-4">
+                    <label for="testPassMarks" class="form-label">Passing Marks <span class="text-danger">*</span></label>
+                    <input 
+                      type="number" 
+                      class="form-control {% if errors.passing_marks %}is-invalid{% endif %}" 
+                      id="testPassMarks" 
+                      name="passing_marks" 
+                      min="1" 
+                      value="{{ request.POST.passing_marks|default:test.passing_marks }}" 
+                      required
+                    >
+                    {% if errors.passing_marks %}
+                      <div class="text-danger small mt-1">{{ errors.passing_marks }}</div>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                  <a href="{% url 'test_detail' test_id=test.test_id %}" class="btn btn-outline-secondary">Cancel</a>
+                  <button type="submit" class="btn btn-hs-primary">
+                    <i class="bi bi-check2 me-1"></i> Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

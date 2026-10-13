@@ -6,15 +6,17 @@ from django.urls import path, include
 urlpatterns = [
     # Public homepage
     path('', include('accounts.urls_public')),
-    # Authentication
+
+    # Administrator Portal & Authentication
     path('admin/', include('accounts.urls_admin')),
+    path('admin/candidates/', include('candidates.urls')),
+    path('admin/tests/', include('assessments.urls')),
+    path('admin/registrations/', include('assessments.urls_registrations')),
+
+    # Candidate Portal & Authentication
     path('candidate/', include('accounts.urls_candidate')),
-    # Admin portal
-    path('dashboard/', include('analytics.urls')),
-    # Candidate management
-    path('dashboard/candidates/', include('candidates.urls')),
-    # Assessment management
-    path('dashboard/assessments/', include('assessments.urls')),
-    # Test attempts
     path('test/', include('attempts.urls')),
+
+    # Backward / convenience alias for dashboard
+    path('dashboard/', include('analytics.urls')),
 ]

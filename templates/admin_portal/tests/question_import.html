@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Upload Questions: {{ test.test_name }} — HireScan Admin{% endblock %}
+
+{% block navbar %}
+<header>
+  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+    <div class="container-fluid px-lg-4">
+      <a class="hs-brand" href="{% url 'admin_dashboard' %}">
+        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+        HireScan <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-6 ms-1">Admin</span>
+      </a>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <span class="small text-muted d-none d-md-inline">Signed in as <strong>{{ request.admin_user.name }}</strong></span>
+        <a href="{% url 'admin_logout' %}" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+      </div>
+    </div>
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex admin-layout-wrapper">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-heading">Navigation</div>
+    <nav class="d-flex flex-column">
+      <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </a>
+      <a href="{% url 'candidate_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-people"></i> Candidates
+      </a>
+      <a href="{% url 'candidate_import' %}" class="sidebar-nav-item">
+        <i class="bi bi-file-earmark-arrow-up"></i> Candidate Imports
+      </a>
+      <a href="{% url 'test_list' %}" class="sidebar-nav-item active">
+        <i class="bi bi-journal-text"></i> Tests
+      </a>
+      <a href="{% url 'registration_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-card-checklist"></i> Test Registrations
+      </a>
+      <div class="sidebar-heading mt-3">System</div>
+      <a href="{% url 'admin_logout' %}" class="sidebar-nav-item text-danger">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="admin-content">
+    <div class="container-fluid px-0">
+      <!-- Breadcrumb -->
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb small mb-2">
+          <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'test_list' %}" class="text-decoration-none">Tests</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'question_list' test_id=test.test_id %}" class="text-decoration-none">Question Bank</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Upload CSV</li>
+        </ol>
+      </nav>
+
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 class="fw-bold mb-0">Upload Question Bank CSV</h2>
+          <p class="text-muted small mb-0">Batch import multiple-choice questions for <strong>{{ test.test_name }}</strong>.</p>
+        </div>
+        <div>
+          <a href="{% url 'question_template_download' %}" class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-1">
+            <i class="bi bi-download"></i> Download Question CSV Template
+          </a>
+        </div>
+      </div>
+
+      <!-- Import Summary Alert (if submitted) -->
+      {% if summary %}
+        <div class="card border-0 shadow-sm rounded-3 mb-4 border-start border-4 border-primary">
+          <div class="card-body p-4">
+            <h5 class="fw-bold mb-3"><i class="bi bi-clipboard-check text-primary me-2"></i>Question Import Summary</h5>
+            <div class="row g-3 text-center">
+              <div class="col-sm-3 col-6">
+                <div class="p-2 bg-light rounded">
+                  <div class="text-muted small">Total Rows</div>
+                  <div class="fs-4 fw-bold">{{ summary.total_rows }}</div>
+                </div>
+              </div>
+              <div class="col-sm-3 col-6">
+                <div class="p-2 bg-success-subtle text-success rounded">
+                  <div class="small">Questions Added</div>
+                  <div class="fs-4 fw-bold">{{ summary.imported }}</div>
+                </div>
+              </div>
+              <div class="col-sm-3 col-6">
+                <div class="p-2 bg-warning-subtle text-warning rounded">
+                  <div class="small">Duplicate Skipped</div>
+                  <div class="fs-4 fw-bold">{{ summary.duplicates_skipped }}</div>
+                </div>
+              </div>
+              <div class="col-sm-3 col-6">
+                <div class="p-2 bg-danger-subtle text-danger rounded">
+                  <div class="small">Failed Rows</div>
+                  <div class="fs-4 fw-bold">{{ summary.invalid_rows }}</div>
+                </div>
+              </div>
+            </div>
+
+            {% if summary.invalid_rows > 0 %}
+              <div class="mt-4 pt-3 border-top d-flex justify-content-between align-items-center">
+                <div class="text-danger small fw-semibold">
+                  <i class="bi bi-exclamation-circle me-1"></i> {{ summary.invalid_rows }} row(s) had errors.
+                </div>
+                <a href="{% url 'question_import_error_csv' %}" class="btn btn-outline-danger btn-sm">
+                  <i class="bi bi-download me-1"></i> Download Failed Rows Error CSV
+                </a>
+              </div>
+
+              <!-- Preview Errors -->
+              <div class="table-responsive mt-3">
+                <table class="table table-sm table-bordered small">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width: 80px;">Row #</th>
+                      <th>Question Preview</th>
+                      <th>Topic</th>
+                      <th>Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for err in summary.errors|slice:":10" %}
+                      <tr>
+                        <td class="font-mono text-center">{{ err.row }}</td>
+                        <td>{{ err.question }}...</td>
+                        <td>{{ err.topic }}</td>
+                        <td class="text-danger">{{ err.reason }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
+
+            <div class="mt-3">
+              <a href="{% url 'question_list' test_id=test.test_id %}" class="btn btn-hs-primary btn-sm">
+                <i class="bi bi-arrow-right me-1"></i> Go to Question Bank
+              </a>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="row g-4">
+        <!-- Upload Form -->
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-header bg-white border-bottom py-3">
+              <h5 class="fw-bold mb-0"><i class="bi bi-file-earmark-arrow-up text-primary me-2"></i>Select Question CSV</h5>
+            </div>
+            <div class="card-body p-4">
+              <form method="POST" action="{% url 'question_import' test_id=test.test_id %}" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+
+                <div class="mb-3">
+                  <label class="form-label text-muted small">Associated Assessment</label>
+                  <div class="p-2 border rounded bg-light fw-bold text-dark">
+                    <i class="bi bi-journal-check text-primary me-2"></i>{{ test.test_name }}
+                  </div>
+                </div>
+
+                <div class="mb-4">
+                  <label for="qCsvFile" class="form-label">Question Bank CSV File <span class="text-danger">*</span></label>
+                  <input type="file" class="form-control" id="qCsvFile" name="csv_file" accept=".csv" required>
+                  <div class="form-text small">Standard CSV format with header row. Max 10MB.</div>
+                </div>
+
+                <button type="submit" class="btn btn-hs-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2">
+                  <i class="bi bi-upload"></i> Upload & Validate Questions
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Format Specification Guidelines -->
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-header bg-white border-bottom py-3">
+              <h5 class="fw-bold mb-0"><i class="bi bi-info-circle text-primary me-2"></i>Column Guidelines</h5>
+            </div>
+            <div class="card-body p-4 small">
+              <p class="text-muted mb-3">Ensure your CSV includes the following headers in row 1:</p>
+
+              <div class="table-responsive">
+                <table class="table table-bordered table-sm mb-3">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Column</th>
+                      <th>Accepted Format</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><code>question</code></td>
+                      <td>Full question statement (required)</td>
+                    </tr>
+                    <tr>
+                      <td><code>option1</code>, <code>option2</code>, <code>option3</code>, <code>option4</code></td>
+                      <td>Four distinct option texts (required)</td>
+                    </tr>
+                    <tr>
+                      <td><code>correct_option</code></td>
+                      <td>Number <code>1</code>, <code>2</code>, <code>3</code>, <code>4</code> or <code>A</code>, <code>B</code>, <code>C</code>, <code>D</code></td>
+                    </tr>
+                    <tr>
+                      <td><code>topic</code></td>
+                      <td>Subject / topic category (required)</td>
+                    </tr>
+                    <tr>
+                      <td><code>difficulty</code></td>
+                      <td><code>easy</code>, <code>medium</code>, or <code>hard</code> (default: medium)</td>
+                    </tr>
+                    <tr>
+                      <td><code>suggestions</code></td>
+                      <td>Improvement guidance for test takers (optional)</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="alert alert-light border py-2 px-3 mb-0">
+                <strong class="text-dark d-block mb-1">Integrity Rules:</strong>
+                <ul class="mb-0 ps-3 text-muted">
+                  <li>Questions with duplicate text in the database for this test are skipped.</li>
+                  <li>Malformed rows are logged with line numbers and downloadable error report.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

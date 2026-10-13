@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Registration: {{ reg.candidate.name }} — {{ reg.test.test_name }}{% endblock %}
+
+{% block navbar %}
+<header>
+  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+    <div class="container-fluid px-lg-4">
+      <a class="hs-brand" href="{% url 'admin_dashboard' %}">
+        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+        HireScan <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-6 ms-1">Admin</span>
+      </a>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <span class="small text-muted d-none d-md-inline">Signed in as <strong>{{ request.admin_user.name }}</strong></span>
+        <a href="{% url 'admin_logout' %}" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+      </div>
+    </div>
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex admin-layout-wrapper">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-heading">Navigation</div>
+    <nav class="d-flex flex-column">
+      <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </a>
+      <a href="{% url 'candidate_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-people"></i> Candidates
+      </a>
+      <a href="{% url 'candidate_import' %}" class="sidebar-nav-item">
+        <i class="bi bi-file-earmark-arrow-up"></i> Candidate Imports
+      </a>
+      <a href="{% url 'test_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-journal-text"></i> Tests
+      </a>
+      <a href="{% url 'registration_list' %}" class="sidebar-nav-item active">
+        <i class="bi bi-card-checklist"></i> Test Registrations
+      </a>
+      <div class="sidebar-heading mt-3">System</div>
+      <a href="{% url 'admin_logout' %}" class="sidebar-nav-item text-danger">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="admin-content">
+    <div class="container-fluid px-0">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb small mb-2">
+          <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'registration_list' %}" class="text-decoration-none">Registrations</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Details</li>
+        </ol>
+      </nav>
+
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <div class="d-flex align-items-center gap-2">
+            <h2 class="fw-bold mb-0">Registration Details</h2>
+            {% if reg.status == 'registered' %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle">Registered</span>
+            {% else %}
+              <span class="badge bg-secondary-subtle text-secondary border">Cancelled</span>
+            {% endif %}
+          </div>
+          <div class="font-mono small text-muted mt-1">ID: {{ reg.registration_id }}</div>
+        </div>
+
+        <div class="d-flex gap-2">
+          {% if reg.status == 'registered' %}
+            <form method="POST" action="{% url 'registration_cancel' registration_id=reg.registration_id %}" onsubmit="return confirm('Cancel this registration?');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-x-circle me-1"></i> Cancel Registration
+              </button>
+            </form>
+          {% endif %}
+          <a href="{% url 'registration_list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Back to Roster
+          </a>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <!-- Candidate Information -->
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+              <h5 class="fw-bold mb-0"><i class="bi bi-person text-primary me-2"></i>Candidate Profile</h5>
+              <a href="{% url 'candidate_detail' candidate_id=reg.candidate.candidate_id %}" class="btn btn-sm btn-outline-primary">
+                View Full Profile
+              </a>
+            </div>
+            <div class="card-body p-4">
+              <div class="row g-3 small">
+                <div class="col-6">
+                  <div class="text-muted">Full Name</div>
+                  <strong class="fs-6 text-dark">{{ reg.candidate.name }}</strong>
+                </div>
+                <div class="col-6">
+                  <div class="text-muted">Email</div>
+                  <div class="font-mono text-dark">{{ reg.candidate.email }}</div>
+                </div>
+                <div class="col-6">
+                  <div class="text-muted">WhatsApp</div>
+                  <div>{{ reg.candidate.whatsapp_number|default:"—" }}</div>
+                </div>
+                <div class="col-6">
+                  <div class="text-muted">Qualification</div>
+                  <div>{{ reg.candidate.qualification|default:"—" }}</div>
+                </div>
+                <div class="col-12">
+                  <div class="text-muted">College / Address</div>
+                  <div>{{ reg.candidate.college_name_address|default:"—" }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Assessment Information -->
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+              <h5 class="fw-bold mb-0"><i class="bi bi-journal-check text-primary me-2"></i>Assessment Specification</h5>
+              <a href="{% url 'test_detail' test_id=reg.test.test_id %}" class="btn btn-sm btn-outline-primary">
+                View Test Specs
+              </a>
+            </div>
+            <div class="card-body p-4">
+              <div class="row g-3 small">
+                <div class="col-12">
+                  <div class="text-muted">Test Title</div>
+                  <strong class="fs-6 text-dark">{{ reg.test.test_name }}</strong>
+                </div>
+                <div class="col-4">
+                  <div class="text-muted">Duration</div>
+                  <strong>{{ reg.test.duration_minutes }} mins</strong>
+                </div>
+                <div class="col-4">
+                  <div class="text-muted">Questions</div>
+                  <strong>{{ reg.test.total_questions }} MCQs</strong>
+                </div>
+                <div class="col-4">
+                  <div class="text-muted">Passing Score</div>
+                  <strong>{{ reg.test.passing_marks }} pts</strong>
+                </div>
+                <div class="col-12">
+                  <div class="text-muted">Test State</div>
+                  <div>
+                    {% if reg.test.is_active %}
+                      <span class="badge bg-success-subtle text-success border border-success-subtle">Active for Candidates</span>
+                    {% else %}
+                      <span class="badge bg-secondary-subtle text-secondary border">Inactive</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attempt Audit Information -->
+        <div class="col-12">
+          <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-header bg-white border-bottom py-3">
+              <h5 class="fw-bold mb-0"><i class="bi bi-clipboard2-pulse text-primary me-2"></i>Attempt Execution Status</h5>
+            </div>
+            <div class="card-body p-4">
+              {% if attempt %}
+                <div class="row g-3 align-items-center">
+                  <div class="col-md-3">
+                    <div class="text-muted small">Status</div>
+                    <span class="badge {% if attempt.status == 'completed' %}bg-success{% elif attempt.status == 'in_progress' %}bg-warning text-dark{% else %}bg-secondary{% endif %} fs-6 px-3 py-2 mt-1">
+                      {{ attempt.status|title }}
+                    </span>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="text-muted small">Score & Percentage</div>
+                    <div class="fs-5 fw-bold text-dark mt-1">
+                      {{ attempt.score|default:"—" }} pts ({{ attempt.percentage|default:"0" }}%)
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="text-muted small">Started At</div>
+                    <div class="small mt-1">{{ attempt.start_time|date:"M d, Y H:i:s" }}</div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="text-muted small">Submitted At</div>
+                    <div class="small mt-1">{{ attempt.end_time|date:"M d, Y H:i:s"|default:"Not finalized yet" }}</div>
+                  </div>
+                </div>
+              {% else %}
+                <div class="p-3 bg-light rounded text-muted small d-flex align-items-center gap-2">
+                  <i class="bi bi-hourglass text-secondary fs-4"></i>
+                  <div>
+                    <strong>No attempt launched yet.</strong> The candidate has not yet initiated their assessment session.
+                  </div>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}
