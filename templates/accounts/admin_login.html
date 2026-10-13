@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Administrator Login — HireScan{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="text-center mb-4">
+      <span class="auth-badge admin">
+        <i class="bi bi-shield-lock me-1"></i> Staff Authentication
+      </span>
+      <h2 class="fw-bold fs-3 mt-1">Administrator Sign In</h2>
+      <p class="text-muted small">Enter your administrator credentials to access the evaluation management dashboard.</p>
+    </div>
+
+    <!-- Error Alerts -->
+    {% if errors.general %}
+      <div class="alert alert-danger py-2 small d-flex align-items-center mb-3" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+        <div>{{ errors.general }}</div>
+      </div>
+    {% endif %}
+
+    <!-- Custom HTML Form (No Django Forms or ModelForms used) -->
+    <form method="POST" action="{% url 'admin_login' %}" novalidate id="adminLoginForm">
+      {% csrf_token %}
+
+      <!-- Email Field -->
+      <div class="mb-3">
+        <label for="adminEmail" class="form-label">Administrator Email</label>
+        <div class="input-group">
+          <span class="input-group-text bg-light text-muted"><i class="bi bi-envelope"></i></span>
+          <input 
+            type="email" 
+            class="form-control {% if errors.email %}is-invalid{% endif %}" 
+            id="adminEmail" 
+            name="email" 
+            placeholder="admin@hirescan.local" 
+            required 
+            autocomplete="email"
+            value="{{ request.POST.email|default:'' }}"
+          >
+        </div>
+        {% if errors.email %}
+          <div class="text-danger small mt-1">{{ errors.email }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Password Field with Show/Hide Toggle -->
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+          <label for="adminPassword" class="form-label">Password</label>
+        </div>
+        <div class="password-input-group">
+          <div class="input-group">
+            <span class="input-group-text bg-light text-muted"><i class="bi bi-key"></i></span>
+            <input 
+              type="password" 
+              class="form-control {% if errors.password %}is-invalid{% endif %}" 
+              id="adminPassword" 
+              name="password" 
+              placeholder="••••••••••••" 
+              required 
+              autocomplete="current-password"
+            >
+          </div>
+          <button 
+            type="button" 
+            class="password-toggle-btn" 
+            data-target="adminPassword" 
+            aria-label="Toggle password visibility"
+            title="Toggle visibility"
+          >
+            <i class="bi bi-eye"></i>
+          </button>
+        </div>
+        {% if errors.password %}
+          <div class="text-danger small mt-1">{{ errors.password }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Submit Button -->
+      <button type="submit" class="btn btn-hs-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2">
+        <i class="bi bi-box-arrow-in-right"></i> Sign In to Dashboard
+      </button>
+
+      <div class="mt-4 pt-2 text-center border-top">
+        <a href="{% url 'homepage' %}" class="text-decoration-none small text-muted d-inline-flex align-items-center gap-1">
+          <i class="bi bi-arrow-left"></i> Return to Homepage
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

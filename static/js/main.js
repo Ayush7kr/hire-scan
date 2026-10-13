@@ -1,0 +1,211 @@
+/**
+ * HireScan — Client-side interaction script
+ */
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  // ──────────────── Password Visibility Toggle ────────────────
+  document.querySelectorAll('.password-toggle-btn').forEach(button => {
+    button.addEventListener('click', function () {
+      const targetId = this.getAttribute('data-target');
+      const input = document.getElementById(targetId);
+      if (input) {
+        if (input.type === 'password') {
+          input.type = 'text';
+          this.innerHTML = '<i class="bi bi-eye-slash"></i>';
+        } else {
+          input.type = 'password';
+          this.innerHTML = '<i class="bi bi-eye"></i>';
+        }
+      }
+    });
+  });
+
+  // ──────────────── Candidate OTP Flow Handler ────────────────
+  const sendOtpForm = document.getElementById('candidateSendOtpForm');
+  const verifyOtpForm = document.getElementById('candidateVerifyOtpForm');
+  const otpMessageAlert = document.getElementById('otpMessageAlert');
+  const resendOtpBtn = document.getElementById('resendOtpBtn');
+  const resendCooldownSpan = document.getElementById('resendCooldown');
+  let cooldownTimer = null;
+
+  function showAlert(msg, isError = true) {
+    if (!otpMessageAlert) return;
+    otpMessageAlert.classList.remove('d-none', 'alert-danger', 'alert-success');
+    otpMessageAlert.classList.add(isError ? 'alert-danger' : 'alert-success');
+    otpMessageAlert.innerText = msg;
+  }
+
+  function startCooldown(seconds) {
+    if (resendOtpBtn) {
+      resendOtpBtn.disabled = true;
+    }
+    let remaining = seconds;
+    if (resendCooldownSpan) {
+      resendCooldownSpan.innerText = ` (${remaining}s)`;
+    }
+    clearInterval(cooldownTimer);
+    cooldownTimer = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(cooldownTimer);
+        if (resendOtpBtn) resendOtpBtn.disabled = false;
+        if (resendCooldownSpan) resendCooldownSpan.innerText = '';
+      } else {
+        if (resendCooldownSpan) resendCooldownSpan.innerText = ` (${remaining}s)`;
+      }
+    }, 1000);
+  }
+
+  if (sendOtpForm) {
+    sendOtpForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const emailInput = document.getElementById('candidateEmail');
+      const email = emailInput ? emailInput.value.trim() : '';
+      const submitBtn = sendOtpForm.querySelector('button[type="submit"]');
+
+      if (!email) {
+        showAlert('Please enter your registered email address.');
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending OTP...';
+      }
+
+      const csrftoken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+      fetch('/candidate/send-otp/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': csrftoken,
+        },
+        body: new URLSearchParams({ email: email })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          showAlert(data.message || 'OTP sent successfully to your email.', false);
+          sendOtpForm.classList.add('d-none');
+          if (verifyOtpForm) {
+            verifyOtpForm.classList.remove('d-none');
+            const otpTargetEmail = document.getElementById('otpTargetEmail');
+            if (otpTargetEmail) otpTargetEmail.innerText = email;
+            const otpCodeInput = document.getElementById('otpCode');
+            if (otpCodeInput) otpCodeInput.focus();
+          }
+          startCooldown(60);
+        } else {
+          showAlert(data.error || 'Failed to send OTP.');
+        }
+      })
+      .catch(err => {
+        showAlert('Network or server error while sending OTP.');
+      })
+      .finally(() => {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = 'Send One-Time Password';
+        }
+      });
+    });
+  }
+
+  if (verifyOtpForm) {
+    verifyOtpForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const otpInput = document.getElementById('otpCode');
+      const otp = otpInput ? otpInput.value.trim() : '';
+      const submitBtn = verifyOtpForm.querySelector('button[type="submit"]');
+
+      if (!otp) {
+        showAlert('Please enter the 6-digit OTP code.');
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verifying...';
+      }
+
+      const csrftoken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+      fetch('/candidate/verify-otp/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': csrftoken,
+        },
+        body: new URLSearchParams({ otp: otp })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          showAlert('Verification successful! Redirecting...', false);
+          window.location.href = data.redirect || '/test/dashboard/';
+        } else {
+          showAlert(data.error || 'Invalid OTP code.');
+        }
+      })
+      .catch(err => {
+        showAlert('Network or server error during verification.');
+      })
+      .finally(() => {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = 'Verify & Enter Assessment Portal';
+        }
+      });
+    });
+  }
+
+  if (resendOtpBtn) {
+    resendOtpBtn.addEventListener('click', function () {
+      const emailInput = document.getElementById('candidateEmail');
+      const email = emailInput ? emailInput.value.trim() : '';
+      if (!email) return;
+
+      resendOtpBtn.disabled = true;
+      const csrftoken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+      fetch('/candidate/send-otp/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': csrftoken,
+        },
+        body: new URLSearchParams({ email: email })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          showAlert('New OTP sent to your email.', false);
+          startCooldown(60);
+        } else {
+          showAlert(data.error || 'Failed to resend OTP.');
+          resendOtpBtn.disabled = false;
+        }
+      })
+      .catch(err => {
+        showAlert('Error requesting new OTP.');
+        resendOtpBtn.disabled = false;
+      });
+    });
+  }
+});

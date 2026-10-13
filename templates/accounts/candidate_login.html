@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Candidate Login — HireScan{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="text-center mb-4">
+      <span class="auth-badge candidate">
+        <i class="bi bi-person-badge me-1"></i> Examinee Portal
+      </span>
+      <h2 class="fw-bold fs-3 mt-1">Candidate Sign In</h2>
+      <p class="text-muted small">Access your registered technical assessments using passwordless email OTP verification.</p>
+    </div>
+
+    <!-- Dynamic Alert for Messages & Errors -->
+    <div id="otpMessageAlert" class="alert d-none py-2 small mb-3" role="alert"></div>
+
+    <!-- Step 1: Email Form (Request OTP) -->
+    <form id="candidateSendOtpForm" novalidate>
+      {% csrf_token %}
+      <div class="mb-3">
+        <label for="candidateEmail" class="form-label">Registered Candidate Email</label>
+        <div class="input-group">
+          <span class="input-group-text bg-light text-muted"><i class="bi bi-envelope-at"></i></span>
+          <input 
+            type="email" 
+            class="form-control" 
+            id="candidateEmail" 
+            name="email" 
+            placeholder="candidate@example.com" 
+            required 
+            autocomplete="email"
+          >
+        </div>
+        <div class="form-text text-muted small mt-1">
+          <i class="bi bi-info-circle me-1"></i> Use the email address specified during assessment registration.
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-hs-candidate w-100 py-2 d-flex align-items-center justify-content-center gap-2">
+        <i class="bi bi-send-fill"></i> Send One-Time Password
+      </button>
+    </form>
+
+    <!-- Step 2: OTP Verification Form (initially hidden) -->
+    <form id="candidateVerifyOtpForm" class="d-none" novalidate>
+      {% csrf_token %}
+      <div class="alert alert-light border py-2 px-3 small mb-3">
+        <div class="text-muted">Verification code sent to:</div>
+        <strong id="otpTargetEmail" class="text-dark"></strong>
+      </div>
+
+      <div class="mb-3">
+        <label for="otpCode" class="form-label">Enter 6-Digit OTP</label>
+        <div class="input-group">
+          <span class="input-group-text bg-light text-muted"><i class="bi bi-shield-lock"></i></span>
+          <input 
+            type="text" 
+            class="form-control text-center font-mono fs-4 fw-bold letter-spacing" 
+            id="otpCode" 
+            name="otp" 
+            maxlength="6" 
+            placeholder="••••••" 
+            required 
+            autocomplete="one-time-code"
+          >
+        </div>
+        <div class="form-text text-muted small mt-1">
+          Code expires in 5 minutes. Max 3 verification attempts.
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-hs-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2">
+        <i class="bi bi-check-circle-fill"></i> Verify & Enter Assessment Portal
+      </button>
+
+      <div class="d-flex justify-content-between align-items-center mt-3 pt-2">
+        <button type="button" class="btn btn-link p-0 small text-decoration-none text-muted" onclick="location.reload();">
+          <i class="bi bi-arrow-left"></i> Change Email
+        </button>
+        <button type="button" class="btn btn-link p-0 small text-decoration-none text-primary" id="resendOtpBtn" disabled>
+          <i class="bi bi-arrow-clockwise"></i> Resend OTP<span id="resendCooldown"></span>
+        </button>
+      </div>
+    </form>
+
+    <div class="mt-4 pt-2 text-center border-top">
+      <a href="{% url 'homepage' %}" class="text-decoration-none small text-muted d-inline-flex align-items-center gap-1">
+        <i class="bi bi-arrow-left"></i> Return to Homepage
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

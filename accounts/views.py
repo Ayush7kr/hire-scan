@@ -1,0 +1,281 @@
+"""
+Views for authentication: admin login, candidate OTP login, logout, and homepage.
+"""
+import secrets
+import json
+from django.shortcuts import render, redirect
+from django.http import JsonResponse
+from django.utils import timezone
+from django.core.mail import send_mail
+from django.conf import settings
+from django.views.decorators.http import require_http_methods
+from datetime import timedelta
+
+from accounts.models import Admin, Candidate, OTPVerification, ActivityLog
+
+
+# ──────────────────────────── Public Homepage ────────────────────────────
+
+def homepage(request):
+    """Public landing page at /."""
+    return render(request, 'public/homepage.html')
+
+
+# ──────────────────────────── Admin Login ────────────────────────────
+
+@require_http_methods(["GET", "POST"])
+def admin_login(request):
+    """Admin login with email + password."""
+    if request.session.get('admin_id'):
+        return redirect('admin_dashboard')
+
+    errors = {}
+
+    if request.method == 'POST':
+        email = request.POST.get('email', '').strip().lower()
+        password = request.POST.get('password', '')
+
+        # Validation
+        if not email:
+            errors['email'] = 'Email is required.'
+        if not password:
+            errors['password'] = 'Password is required.'
+
+        if not errors:
+            try:
+                admin = Admin.objects.get(email=email)
+                if admin.check_password(password):
+                    # Successful login
+                    request.session.flush()
+                    request.session['admin_id'] = str(admin.admin_id)
+                    request.session['user_role'] = 'admin'
+                    request.session['user_name'] = admin.name
+                    request.session['user_email'] = admin.email
+
+                    ActivityLog.objects.create(
+                        admin=admin,
+                        activity_type='admin_login',
+                        activity_details=f'Admin {admin.name} logged in successfully.'
+                    )
+                    return redirect('admin_dashboard')
+                else:
+                    errors['general'] = 'Invalid email or password.'
+            except Admin.DoesNotExist:
+                # Generic error to prevent email enumeration
+                errors['general'] = 'Invalid email or password.'
+
+        # Log failed attempt
+        ActivityLog.objects.create(
+            activity_type='admin_login_failed',
+            activity_details=f'Failed login attempt for email: {email}'
+        )
+
+    return render(request, 'accounts/admin_login.html', {'errors': errors})
+
+
+# ──────────────────────────── Candidate Login ────────────────────────────
+
+@require_http_methods(["GET", "POST"])
+def candidate_login(request):
+    """Candidate login page — email entry and OTP verification."""
+    if request.session.get('candidate_id'):
+        return redirect('candidate_dashboard')
+    return render(request, 'accounts/candidate_login.html')
+
+
+@require_http_methods(["POST"])
+def candidate_send_otp(request):
+    """Send OTP to candidate's registered email."""
+    email = request.POST.get('email', '').strip().lower()
+
+    if not email:
+        return JsonResponse({'success': False, 'error': 'Email is required.'})
+
+    # Check if candidate exists (generic response to prevent enumeration)
+    try:
+        candidate = Candidate.objects.get(email=email)
+    except Candidate.DoesNotExist:
+        # Return same success message to prevent email enumeration
+        return JsonResponse({
+            'success': True,
+            'message': 'If an account exists with this email, an OTP has been sent.'
+        })
+
+    # Check resend cooldown
+    recent_otp = OTPVerification.objects.filter(
+        candidate=candidate,
+        is_used=False,
+        created_at__gte=timezone.now() - timedelta(seconds=settings.OTP_RESEND_COOLDOWN_SECONDS)
+    ).first()
+
+    if recent_otp:
+        remaining = settings.OTP_RESEND_COOLDOWN_SECONDS - (
+            timezone.now() - recent_otp.created_at
+        ).total_seconds()
+        return JsonResponse({
+            'success': False,
+            'error': f'Please wait {int(remaining)} seconds before requesting a new OTP.'
+        })
+
+    # Invalidate previous unused OTPs
+    OTPVerification.objects.filter(
+        candidate=candidate, is_used=False
+    ).update(is_used=True)
+
+    # Generate new OTP
+    otp_code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+
+    # Create OTP record with hashed OTP
+    otp_record = OTPVerification(
+        candidate=candidate,
+        expires_at=timezone.now() + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
+    )
+    otp_record.set_otp(otp_code)
+    otp_record.save()
+
+    # Send OTP via email
+    try:
+        send_mail(
+            subject='HireScan — Your Login OTP',
+            message=f'Your one-time login code is: {otp_code}\n\n'
+                    f'This code expires in {settings.OTP_EXPIRY_MINUTES} minutes.\n\n'
+                    f'If you did not request this code, please ignore this email.',
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[candidate.email],
+            fail_silently=False,
+        )
+    except Exception:
+        # In development with console backend this won't fail,
+        # but handle gracefully for production
+        pass
+
+    # Store candidate email in session for OTP verification step
+    request.session['otp_email'] = email
+    request.session['otp_id'] = str(otp_record.otp_id)
+
+    ActivityLog.objects.create(
+        candidate=candidate,
+        activity_type='otp_sent',
+        activity_details=f'OTP sent to {candidate.email}'
+    )
+
+    return JsonResponse({
+        'success': True,
+        'message': 'If an account exists with this email, an OTP has been sent.'
+    })
+
+
+@require_http_methods(["POST"])
+def candidate_verify_otp(request):
+    """Verify the OTP entered by the candidate."""
+    email = request.session.get('otp_email', '')
+    otp_code = request.POST.get('otp', '').strip()
+
+    if not email or not otp_code:
+        return JsonResponse({'success': False, 'error': 'Invalid request.'})
+
+    try:
+        candidate = Candidate.objects.get(email=email)
+    except Candidate.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Invalid verification attempt.'})
+
+    # Get the latest unused OTP for this candidate
+    otp_record = OTPVerification.objects.filter(
+        candidate=candidate,
+        is_used=False,
+    ).order_by('-created_at').first()
+
+    if not otp_record:
+        return JsonResponse({'success': False, 'error': 'No active OTP found. Please request a new one.'})
+
+    # Check if expired
+    if otp_record.is_expired:
+        otp_record.is_used = True
+        otp_record.save()
+        return JsonResponse({'success': False, 'error': 'OTP has expired. Please request a new one.'})
+
+    # Check attempt limit
+    if otp_record.attempts >= settings.OTP_MAX_ATTEMPTS:
+        otp_record.is_used = True
+        otp_record.save()
+        return JsonResponse({
+            'success': False,
+            'error': 'Too many invalid attempts. Please request a new OTP.'
+        })
+
+    # Verify OTP
+    if otp_record.check_otp(otp_code):
+        otp_record.is_used = True
+        otp_record.save()
+
+        # Create candidate session
+        request.session.flush()
+        request.session['candidate_id'] = str(candidate.candidate_id)
+        request.session['user_role'] = 'candidate'
+        request.session['user_name'] = candidate.name
+        request.session['user_email'] = candidate.email
+
+        ActivityLog.objects.create(
+            candidate=candidate,
+            activity_type='candidate_login',
+            activity_details=f'Candidate {candidate.name} logged in successfully.'
+        )
+
+        return JsonResponse({'success': True, 'redirect': '/test/dashboard/'})
+    else:
+        # Increment attempt counter
+        otp_record.attempts += 1
+        otp_record.save()
+
+        remaining = settings.OTP_MAX_ATTEMPTS - otp_record.attempts
+        error_msg = 'Invalid OTP.'
+        if remaining > 0:
+            error_msg += f' {remaining} attempt(s) remaining.'
+        else:
+            error_msg = 'Too many invalid attempts. Please request a new OTP.'
+            otp_record.is_used = True
+            otp_record.save()
+
+        ActivityLog.objects.create(
+            candidate=candidate,
+            activity_type='otp_verification_failed',
+            activity_details=f'Invalid OTP attempt for {candidate.email}'
+        )
+
+        return JsonResponse({'success': False, 'error': error_msg})
+
+
+# ──────────────────────────── Logout ────────────────────────────
+
+def admin_logout(request):
+    """Log out the administrator and clear session."""
+    admin_id = request.session.get('admin_id')
+    if admin_id:
+        try:
+            admin = Admin.objects.get(admin_id=admin_id)
+            ActivityLog.objects.create(
+                admin=admin,
+                activity_type='admin_logout',
+                activity_details=f'Admin {admin.name} logged out.'
+            )
+        except Admin.DoesNotExist:
+            pass
+    request.session.flush()
+    return redirect('homepage')
+
+
+def candidate_logout(request):
+    """Log out the candidate and clear session."""
+    candidate_id = request.session.get('candidate_id')
+    if candidate_id:
+        try:
+            candidate = Candidate.objects.get(candidate_id=candidate_id)
+            ActivityLog.objects.create(
+                candidate=candidate,
+                activity_type='candidate_logout',
+                activity_details=f'Candidate {candidate.name} logged out.'
+            )
+        except Candidate.DoesNotExist:
+            pass
+    request.session.flush()
+    return redirect('homepage')

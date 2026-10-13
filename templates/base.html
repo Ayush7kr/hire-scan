@@ -1,0 +1,147 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}HireScan — Test Management Tool{% endblock %}</title>
+  <meta name="description" content="HireScan helps organizations manage candidate registrations, conduct secure technical assessments, and evaluate performance through detailed analytics.">
+
+  <!-- Bootstrap 5 CSS & Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+  <!-- Custom HireScan Styling -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  {% block navbar %}
+  <header>
+    <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+      <div class="container">
+        <a class="hs-brand" href="{% url 'homepage' %}">
+          <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+          HireScan
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#hsNavbarNav" aria-controls="hsNavbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="hsNavbarNav">
+          <ul class="navbar-nav ms-auto align-items-lg-center gap-2">
+            <li class="nav-item">
+              <a class="hs-nav-link" href="{% url 'homepage' %}#home">Home</a>
+            </li>
+            <li class="nav-item">
+              <a class="hs-nav-link" href="{% url 'homepage' %}#about">About</a>
+            </li>
+            <li class="nav-item">
+              <a class="hs-nav-link" href="{% url 'homepage' %}#how-it-works">How It Works</a>
+            </li>
+            <li class="nav-item">
+              <a class="hs-nav-link" href="{% url 'homepage' %}#features">Features</a>
+            </li>
+            <li class="nav-item">
+              <a class="hs-nav-link" href="{% url 'homepage' %}#contact">Contact</a>
+            </li>
+            <li class="nav-item ms-lg-2">
+              <div class="dropdown">
+                <button class="btn btn-hs-primary dropdown-toggle py-1 px-3" type="button" id="loginDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                  <i class="bi bi-person-fill-lock me-1"></i> Sign In
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="loginDropdown">
+                  <li><a class="dropdown-item py-2" href="{% url 'admin_login' %}"><i class="bi bi-shield-lock me-2 text-primary"></i> Administrator Portal</a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item py-2" href="{% url 'candidate_login' %}"><i class="bi bi-person-badge me-2 text-success"></i> Candidate Login</a></li>
+                </ul>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+  </header>
+  {% endblock %}
+
+  <!-- Messages / Flash Alerts -->
+  <div class="container mt-3">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <!-- Main Content -->
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  {% block footer %}
+  <footer class="hs-footer" id="contact">
+    <div class="container">
+      <div class="row g-4">
+        <div class="col-lg-5 col-md-6">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+            <span class="text-white fw-bold fs-5">HireScan</span>
+          </div>
+          <p class="text-muted pe-lg-4 mb-3">
+            A comprehensive, secure Test Management Tool designed for modern recruitment workflows, automated assessment delivery, and reliable candidate evaluation.
+          </p>
+          <div class="small text-secondary">
+            Project Release: Phase 1 Core Setup
+          </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+          <h6 class="text-white fw-bold mb-3">Assessment Portals</h6>
+          <ul class="list-unstyled d-flex flex-column gap-2 mb-0">
+            <li><a href="{% url 'admin_login' %}"><i class="bi bi-chevron-right text-primary me-1 small"></i> Administrator Login</a></li>
+            <li><a href="{% url 'candidate_login' %}"><i class="bi bi-chevron-right text-success me-1 small"></i> Candidate Login</a></li>
+            <li><a href="{% url 'homepage' %}#how-it-works"><i class="bi bi-chevron-right text-muted me-1 small"></i> Assessment Workflow</a></li>
+          </ul>
+        </div>
+
+        <div class="col-lg-4 col-md-12">
+          <h6 class="text-white fw-bold mb-3">Support & Security</h6>
+          <p class="small text-muted mb-2">
+            Candidates receive assessment invites and one-time access verification codes exclusively through administrator import registrations.
+          </p>
+          <div class="badge bg-dark border border-secondary text-light p-2">
+            <i class="bi bi-lock-fill text-warning me-1"></i> End-to-End Evaluation Security
+          </div>
+        </div>
+      </div>
+
+      <hr class="hs-footer-divider">
+
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 small text-muted">
+        <div>
+          &copy; {% now "Y" %} HireScan Test Management Tool. All rights reserved.
+        </div>
+        <div class="d-flex gap-3">
+          <span>Secure Session Authentication</span>
+          <span>&bull;</span>
+          <span>Role-Based Access Control</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+  {% endblock %}
+
+  <!-- Bootstrap 5 JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- HireScan Main Script -->
+  <script src="{% static 'js/main.js' %}"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

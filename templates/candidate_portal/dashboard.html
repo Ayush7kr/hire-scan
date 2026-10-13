@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Candidate Assessment Portal — HireScan{% endblock %}
+
+{% block navbar %}
+<!-- Candidate Top Navbar -->
+<header>
+  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+    <div class="container">
+      <a class="hs-brand" href="{% url 'candidate_dashboard' %}">
+        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+        HireScan <span class="badge bg-success-subtle text-success border border-success-subtle fs-6 ms-1">Candidate</span>
+      </a>
+
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#candidateNavbarNav" aria-controls="candidateNavbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="candidateNavbarNav">
+        <ul class="navbar-nav ms-auto align-items-center gap-3">
+          <li class="nav-item">
+            <span class="small text-muted">Examinee: <strong>{{ candidate.name }}</strong> ({{ candidate.email }})</span>
+          </li>
+          <li class="nav-item">
+            <a href="{% url 'candidate_logout' %}" class="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-1">
+              <i class="bi bi-box-arrow-right"></i> Logout
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <!-- Candidate Welcome Header -->
+  <div class="p-4 bg-white border rounded-3 shadow-sm mb-4">
+    <div class="row align-items-center">
+      <div class="col-md-8">
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle mb-2">Authenticated Assessment Session</span>
+        <h2 class="fw-bold mb-1">Welcome, {{ candidate.name }}</h2>
+        <p class="text-muted small mb-0">
+          Below are your registered assessments. Please review the instructions carefully before launching any timed test.
+        </p>
+      </div>
+      <div class="col-md-4 text-md-end mt-3 mt-md-0">
+        <div class="small text-muted">Registered Email</div>
+        <strong class="text-dark">{{ candidate.email }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assigned Assessments -->
+  <h4 class="fw-bold mb-3"><i class="bi bi-journal-code text-primary me-2"></i>Your Assigned Assessments</h4>
+
+  <div class="row g-4">
+    {% if tests %}
+      {% for item in tests %}
+        <div class="col-lg-6">
+          <div class="card h-100 border shadow-sm rounded-3">
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-start mb-3">
+                <h5 class="fw-bold mb-0 text-dark">{{ item.test.test_name }}</h5>
+                {% if item.attempt %}
+                  {% if item.attempt.status == 'completed' %}
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                      <i class="bi bi-check-circle-fill me-1"></i> Completed
+                    </span>
+                  {% elif item.attempt.status == 'in_progress' %}
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1">
+                      <i class="bi bi-hourglass-split me-1"></i> In Progress
+                    </span>
+                  {% else %}
+                    <span class="badge bg-secondary-subtle text-secondary px-2 py-1">
+                      {{ item.attempt.status|title }}
+                    </span>
+                  {% endif %}
+                {% elif item.test.is_active %}
+                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
+                    <i class="bi bi-lightning-charge-fill me-1"></i> Ready to Start
+                  </span>
+                {% else %}
+                  <span class="badge bg-secondary-subtle text-secondary px-2 py-1">
+                    Not Yet Active
+                  </span>
+                {% endif %}
+              </div>
+
+              <p class="text-muted small mb-3">
+                {{ item.test.description|default:"Standard technical assessment covering core competency questions." }}
+              </p>
+
+              <!-- Test specs -->
+              <div class="row g-2 mb-4 py-2 px-1 bg-light rounded text-center small">
+                <div class="col-4 border-end">
+                  <div class="text-muted">Duration</div>
+                  <strong>{{ item.test.duration_minutes }} mins</strong>
+                </div>
+                <div class="col-4 border-end">
+                  <div class="text-muted">Questions</div>
+                  <strong>{{ item.test.total_questions }} MCQs</strong>
+                </div>
+                <div class="col-4">
+                  <div class="text-muted">Passing Marks</div>
+                  <strong>{{ item.test.passing_marks }} pts</strong>
+                </div>
+              </div>
+
+              <!-- Action button -->
+              <div>
+                {% if item.attempt %}
+                  {% if item.attempt.status == 'completed' %}
+                    <div class="d-flex justify-content-between align-items-center">
+                      <span class="text-muted small">Submitted on {{ item.attempt.end_time|date:"M d, Y H:i" }}</span>
+                      <button class="btn btn-outline-success btn-sm disabled" disabled>
+                        <i class="bi bi-check2 me-1"></i> Attempt Recorded
+                      </button>
+                    </div>
+                  {% else %}
+                    <a href="#resume-test" class="btn btn-warning w-100 fw-bold">
+                      <i class="bi bi-arrow-repeat me-1"></i> Resume Attempt
+                    </a>
+                  {% endif %}
+                {% elif item.can_start %}
+                  <a href="#start-test" class="btn btn-hs-primary w-100 fw-bold">
+                    <i class="bi bi-play-circle-fill me-1"></i> Launch Assessment
+                  </a>
+                {% else %}
+                  <button class="btn btn-secondary w-100 disabled" disabled>
+                    <i class="bi bi-lock-fill me-1"></i> Assessment Unavailable
+                  </button>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="col-12">
+        <div class="p-5 text-center bg-white border rounded-3 shadow-sm">
+          <i class="bi bi-journal-x fs-1 text-muted d-block mb-3"></i>
+          <h5 class="fw-bold">No Assessments Assigned</h5>
+          <p class="text-muted small max-w-md mx-auto mb-0">
+            You do not have any registered assessments at this time. If you believe this is an error, please contact your recruitment administrator.
+          </p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

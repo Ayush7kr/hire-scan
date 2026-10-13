@@ -1,0 +1,270 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Administrator Dashboard — HireScan{% endblock %}
+
+{% block navbar %}
+<!-- Admin Specialized Top Navbar -->
+<header>
+  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+    <div class="container-fluid px-lg-4">
+      <a class="hs-brand" href="{% url 'admin_dashboard' %}">
+        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+        HireScan <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-6 ms-1">Admin</span>
+      </a>
+
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNavbarNav" aria-controls="adminNavbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="adminNavbarNav">
+        <ul class="navbar-nav ms-auto align-items-center gap-3">
+          <li class="nav-item">
+            <span class="small text-muted">Signed in as <strong>{{ admin_user.name }}</strong> ({{ admin_user.email }})</span>
+          </li>
+          <li class="nav-item">
+            <a href="{% url 'admin_logout' %}" class="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-1">
+              <i class="bi bi-box-arrow-right"></i> Logout
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex admin-layout-wrapper">
+  <!-- Admin Sidebar Navigation -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-heading">Navigation</div>
+    <nav class="d-flex flex-column">
+      <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item active">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </a>
+      <a href="#candidates" class="sidebar-nav-item">
+        <i class="bi bi-people"></i> Candidates
+      </a>
+      <a href="#imports" class="sidebar-nav-item">
+        <i class="bi bi-file-earmark-arrow-up"></i> Candidate Imports
+      </a>
+      <a href="#tests" class="sidebar-nav-item">
+        <i class="bi bi-journal-text"></i> Tests
+      </a>
+      <a href="#questions" class="sidebar-nav-item">
+        <i class="bi bi-patch-question"></i> Question Banks
+      </a>
+      <a href="#registrations" class="sidebar-nav-item">
+        <i class="bi bi-card-checklist"></i> Test Registrations
+      </a>
+
+      <div class="sidebar-heading mt-3">Insights</div>
+      <a href="#results" class="sidebar-nav-item">
+        <i class="bi bi-award"></i> Results
+      </a>
+      <a href="#analytics" class="sidebar-nav-item">
+        <i class="bi bi-graph-up"></i> Analytics
+      </a>
+      <a href="#reports" class="sidebar-nav-item">
+        <i class="bi bi-file-earmark-spreadsheet"></i> Reports
+      </a>
+
+      <div class="sidebar-heading mt-3">System</div>
+      <a href="{% url 'admin_logout' %}" class="sidebar-nav-item text-danger">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Admin Main Content Area -->
+  <main class="admin-content">
+    <div class="container-fluid px-0">
+      <!-- Page Header & Quick Actions -->
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+        <div>
+          <h2 class="fw-bold mb-1">System Overview</h2>
+          <p class="text-muted small mb-0">Live statistics and evaluation pipeline monitoring.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="#tests" class="btn btn-hs-primary btn-sm d-inline-flex align-items-center gap-1">
+            <i class="bi bi-plus-circle"></i> Create Test
+          </a>
+          <a href="#imports" class="btn btn-hs-outline btn-sm d-inline-flex align-items-center gap-1">
+            <i class="bi bi-upload"></i> Import Candidates
+          </a>
+          <a href="#questions" class="btn btn-hs-outline btn-sm d-inline-flex align-items-center gap-1">
+            <i class="bi bi-file-earmark-arrow-up"></i> Upload Questions
+          </a>
+        </div>
+      </div>
+
+      <!-- Real Database Metric Cards -->
+      <div class="row g-3 mb-4">
+        <!-- Total Candidates -->
+        <div class="col-xl-3 col-sm-6">
+          <div class="metric-card">
+            <div>
+              <div class="metric-label">Total Candidates</div>
+              <div class="metric-value">{{ total_candidates }}</div>
+            </div>
+            <div class="hs-card-icon blue mb-0">
+              <i class="bi bi-people-fill"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Total Tests -->
+        <div class="col-xl-3 col-sm-6">
+          <div class="metric-card">
+            <div>
+              <div class="metric-label">Total Tests</div>
+              <div class="metric-value">{{ total_tests }}</div>
+            </div>
+            <div class="hs-card-icon purple mb-0">
+              <i class="bi bi-journal-check"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Tests -->
+        <div class="col-xl-3 col-sm-6">
+          <div class="metric-card">
+            <div>
+              <div class="metric-label">Active Tests</div>
+              <div class="metric-value text-success">{{ active_tests }}</div>
+            </div>
+            <div class="hs-card-icon emerald mb-0">
+              <i class="bi bi-toggle-on"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Completed Attempts -->
+        <div class="col-xl-3 col-sm-6">
+          <div class="metric-card">
+            <div>
+              <div class="metric-label">Completed Attempts</div>
+              <div class="metric-value text-primary">{{ completed_attempts }}</div>
+            </div>
+            <div class="hs-card-icon sky mb-0">
+              <i class="bi bi-clipboard2-check-fill"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <!-- Test Performance Overview Table -->
+        <div class="col-xl-8">
+          <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+              <h5 class="fw-bold mb-0"><i class="bi bi-bar-chart-line text-primary me-2"></i>Test Performance Overview</h5>
+              <span class="badge bg-light text-muted border">Live Data</span>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 table-custom border-0">
+                <thead>
+                  <tr>
+                    <th>Test Name</th>
+                    <th>Status</th>
+                    <th>Registrations</th>
+                    <th>Completed</th>
+                    <th>Avg. Score</th>
+                    <th>Pass Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% if test_summaries %}
+                    {% for item in test_summaries %}
+                      <tr>
+                        <td>
+                          <strong>{{ item.test.test_name }}</strong>
+                          <div class="small text-muted">{{ item.test.duration_minutes }}m &bull; {{ item.test.total_questions }} Qs</div>
+                        </td>
+                        <td>
+                          {% if item.test.is_active %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                          {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border">Inactive</span>
+                          {% endif %}
+                        </td>
+                        <td>{{ item.registrations }}</td>
+                        <td>{{ item.completed }}</td>
+                        <td><strong>{{ item.avg_score }}%</strong></td>
+                        <td>
+                          <div class="d-flex align-items-center gap-2">
+                            <span>{{ item.pass_rate }}%</span>
+                            <div class="progress flex-grow-1" style="height: 6px;">
+                              <div class="progress-bar bg-success" role="progressbar" style="width: {{ item.pass_rate }}%" aria-valuenow="{{ item.pass_rate }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr>
+                      <td colspan="6" class="text-center py-4 text-muted">
+                        <i class="bi bi-inbox fs-3 d-block mb-2 text-secondary"></i>
+                        No assessment tests created yet. Use the <strong>Create Test</strong> button to configure one.
+                      </td>
+                    </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Activity Feed -->
+        <div class="col-xl-4">
+          <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-white border-bottom py-3">
+              <h5 class="fw-bold mb-0"><i class="bi bi-clock-history text-primary me-2"></i>Recent Activity</h5>
+            </div>
+            <div class="card-body p-3">
+              {% if recent_activity %}
+                <div class="d-flex flex-column gap-3">
+                  {% for act in recent_activity %}
+                    <div class="d-flex align-items-start gap-2 pb-2 border-bottom">
+                      <div class="small mt-1">
+                        {% if 'login' in act.activity_type %}
+                          <i class="bi bi-person-check-fill text-primary"></i>
+                        {% elif 'otp' in act.activity_type %}
+                          <i class="bi bi-envelope-fill text-info"></i>
+                        {% elif 'test' in act.activity_type %}
+                          <i class="bi bi-journal-check text-success"></i>
+                        {% else %}
+                          <i class="bi bi-activity text-secondary"></i>
+                        {% endif %}
+                      </div>
+                      <div class="flex-grow-1">
+                        <div class="small fw-semibold text-dark">{{ act.activity_type|title }}</div>
+                        <div class="small text-muted">{{ act.activity_details|truncatechars:70 }}</div>
+                        <div class="text-secondary" style="font-size: 0.75rem;">{{ act.occurred_at|timesince }} ago</div>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="text-center py-4 text-muted small">
+                  <i class="bi bi-hourglass-split fs-4 d-block mb-1"></i>
+                  No system activity recorded yet.
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block footer %}
+<!-- Simplified footer on admin dashboard to maximize working space -->
+<footer class="bg-white border-top py-2 px-4 text-muted small d-flex justify-content-between align-items-center">
+  <div>HireScan Administrator Portal &bull; Phase 1 Active</div>
+  <div>Server Status: <span class="badge bg-success-subtle text-success">Connected</span></div>
+</footer>
+{% endblock %}
