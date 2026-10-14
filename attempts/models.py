@@ -27,6 +27,7 @@ class TestAttempt(models.Model):
     percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     is_passed = models.BooleanField(null=True, blank=True)
     time_taken_seconds = models.IntegerField(null=True, blank=True)
+    submission_reason = models.CharField(max_length=50, blank=True, default='')  # 'manual', 'timeout'
 
     class Meta:
         db_table = 'test_attempt'
@@ -37,6 +38,25 @@ class TestAttempt(models.Model):
 
     def __str__(self):
         return f"Attempt by {self.registration.candidate.name} for {self.registration.test.test_name}"
+
+    @property
+    def deadline(self):
+        """Authoritative server-side deadline based on start_time and test duration."""
+        from datetime import timedelta
+        return self.start_time + timedelta(minutes=self.registration.test.duration_minutes)
+
+    @property
+    def is_expired(self):
+        """Check whether the attempt time limit has elapsed on the server."""
+        from django.utils import timezone
+        return timezone.now() > self.deadline
+
+    @property
+    def remaining_seconds(self):
+        """Calculate remaining time in seconds from server timestamp."""
+        from django.utils import timezone
+        diff = (self.deadline - timezone.now()).total_seconds()
+        return max(0, int(diff))
 
 
 class AttemptQuestion(models.Model):
@@ -55,6 +75,7 @@ class AttemptQuestion(models.Model):
         help_text='The option the candidate selected (null if unanswered)'
     )
     is_correct = models.BooleanField(null=True, blank=True)
+    answered_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'attempt_question'
@@ -71,3 +92,4 @@ class AttemptQuestion(models.Model):
 
     def __str__(self):
         return f"Q{self.question_order} in {self.attempt}"
+

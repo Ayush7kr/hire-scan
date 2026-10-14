@@ -974,3 +974,88 @@ def registration_cancel(request, registration_id):
     )
     messages.success(request, "Registration cancelled successfully.")
     return redirect('registration_list')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. ATTEMPT INSPECTION (ADMIN)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@admin_required
+def admin_test_attempts(request, test_id):
+    """
+    List candidate attempts for a specific assessment.
+    """
+    test = get_object_or_404(Test, test_id=test_id)
+    search_query = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+
+    attempts_qs = TestAttempt.objects.filter(
+        registration__test=test
+    ).select_related('registration__candidate').order_by('-start_time')
+
+    if search_query:
+        attempts_qs = attempts_qs.filter(
+            Q(registration__candidate__name__icontains=search_query) |
+            Q(registration__candidate__email__icontains=search_query)
+        )
+
+    if status_filter:
+        attempts_qs = attempts_qs.filter(status=status_filter)
+
+    paginator = Paginator(attempts_qs, 15)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # Calculate basic summary metrics
+    total_attempts = attempts_qs.count()
+    completed_count = attempts_qs.filter(status='completed').count()
+    passed_count = attempts_qs.filter(is_passed=True).count()
+
+    context = {
+        'test': test,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'total_attempts': total_attempts,
+        'completed_count': completed_count,
+        'passed_count': passed_count,
+    }
+    return render(request, 'admin_portal/tests/attempts_list.html', context)
+
+
+@admin_required
+def admin_attempt_detail(request, attempt_id):
+    """
+    Detailed view of a candidate's attempt for administrators.
+    Displays questions, selected answers, correct answers, topic performance, and score metrics.
+    """
+    from attempts.services import get_topic_performance
+
+    attempt = get_object_or_404(
+        TestAttempt.objects.select_related('registration__test', 'registration__candidate'),
+        attempt_id=attempt_id
+    )
+
+    topic_performance = get_topic_performance(attempt)
+    attempt_questions = list(
+        attempt.attempt_questions
+        .select_related('question')
+        .order_by('question_order')
+    )
+
+    # Format time taken
+    seconds = attempt.time_taken_seconds or 0
+    mins = seconds // 60
+    secs = seconds % 60
+    time_taken_formatted = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
+
+    context = {
+        'attempt': attempt,
+        'test': attempt.registration.test,
+        'candidate': attempt.registration.candidate,
+        'topic_performance': topic_performance,
+        'attempt_questions': attempt_questions,
+        'time_taken_formatted': time_taken_formatted,
+    }
+    return render(request, 'admin_portal/tests/attempt_detail.html', context)
+

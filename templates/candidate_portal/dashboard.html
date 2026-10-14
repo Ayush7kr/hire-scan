@@ -111,21 +111,19 @@
 
               <!-- Action button -->
               <div>
-                {% if item.attempt %}
-                  {% if item.attempt.status == 'completed' %}
-                    <div class="d-flex justify-content-between align-items-center">
-                      <span class="text-muted small">Submitted on {{ item.attempt.end_time|date:"M d, Y H:i" }}</span>
-                      <button class="btn btn-outline-success btn-sm disabled" disabled>
-                        <i class="bi bi-check2 me-1"></i> Attempt Recorded
-                      </button>
-                    </div>
-                  {% else %}
-                    <a href="#resume-test" class="btn btn-warning w-100 fw-bold">
-                      <i class="bi bi-arrow-repeat me-1"></i> Resume Attempt
+                {% if item.is_completed %}
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">Submitted on {{ item.attempt.end_time|date:"M d, Y H:i" }}</span>
+                    <a href="{% url 'test_results' item.attempt.attempt_id %}" class="btn btn-hs-primary btn-sm fw-bold">
+                      <i class="bi bi-file-earmark-bar-graph me-1"></i> View Results
                     </a>
-                  {% endif %}
+                  </div>
+                {% elif item.can_resume %}
+                  <a href="{% url 'test_take' item.attempt.attempt_id %}" class="btn btn-warning w-100 fw-bold text-dark">
+                    <i class="bi bi-arrow-repeat me-1"></i> Resume Attempt
+                  </a>
                 {% elif item.can_start %}
-                  <a href="#start-test" class="btn btn-hs-primary w-100 fw-bold">
+                  <a href="{% url 'test_instructions' item.registration.registration_id %}" class="btn btn-hs-primary w-100 fw-bold">
                     <i class="bi bi-play-circle-fill me-1"></i> Launch Assessment
                   </a>
                 {% else %}
@@ -135,6 +133,7 @@
                 {% endif %}
               </div>
             </div>
+
           </div>
         </div>
       {% endfor %}

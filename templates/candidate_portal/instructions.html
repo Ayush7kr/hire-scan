@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Instructions: {{ test.test_name }} — HireScan{% endblock %}
+
+{% block navbar %}
+<!-- Candidate Top Navbar -->
+<header>
+  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+    <div class="container">
+      <a class="hs-brand" href="{% url 'candidate_dashboard' %}">
+        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+        HireScan <span class="badge bg-success-subtle text-success border border-success-subtle fs-6 ms-1">Candidate</span>
+      </a>
+
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <span class="small text-muted d-none d-md-inline">Examinee: <strong>{{ candidate.name }}</strong> ({{ candidate.email }})</span>
+        <a href="{% url 'candidate_logout' %}" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+      </div>
+    </div>
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="{% url 'candidate_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Assessment Instructions</li>
+    </ol>
+  </nav>
+
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+      <!-- Test Header Card -->
+      <div class="card border shadow-sm rounded-3 mb-4">
+        <div class="card-body p-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 mb-2">Pre-Assessment Briefing</span>
+              <h2 class="fw-bold mb-1 text-dark">{{ test.test_name }}</h2>
+            </div>
+            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 fs-6">
+              <i class="bi bi-shield-lock-fill me-1"></i> Authorized Candidate Session
+            </span>
+          </div>
+
+          <p class="text-muted mb-4">
+            {{ test.description|default:"Please review the test rules and technical specifications below before beginning the assessment. Once launched, the authoritative timer will start immediately." }}
+          </p>
+
+          <!-- Test Specifications Metric Strip -->
+          <div class="row g-3 py-3 px-2 bg-light rounded-3 text-center mb-2">
+            <div class="col-6 col-md-3 border-end">
+              <div class="text-muted small">Duration Limit</div>
+              <strong class="fs-5 text-dark">{{ test.duration_minutes }} minutes</strong>
+            </div>
+            <div class="col-6 col-md-3 border-end-md">
+              <div class="text-muted small">Total Questions</div>
+              <strong class="fs-5 text-dark">{{ test.total_questions }} MCQs</strong>
+            </div>
+            <div class="col-6 col-md-3 border-end">
+              <div class="text-muted small">Passing Threshold</div>
+              <strong class="fs-5 text-dark">{{ test.passing_marks }} marks</strong>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="text-muted small">Scoring Model</div>
+              <strong class="fs-5 text-success">+1 / 0 (No Negative)</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Assessment Instructions & Rules Card -->
+      <div class="card border shadow-sm rounded-3 mb-4">
+        <div class="card-header bg-white border-bottom py-3">
+          <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-card-checklist text-primary me-2"></i>Assessment Rules & Guidelines
+          </h5>
+        </div>
+        <div class="card-body p-4">
+          <ul class="list-unstyled mb-0 d-flex flex-column gap-3 text-secondary">
+            <li class="d-flex align-items-start gap-2">
+              <i class="bi bi-clock-history text-primary fs-5 mt-n1"></i>
+              <div>
+                <strong class="text-dark">Authoritative Server Timer:</strong> The countdown timer begins the instant you click "Start Assessment". The server maintains the master clock. If your timer reaches 00:00, your test will finalize automatically.
+              </div>
+            </li>
+            <li class="d-flex align-items-start gap-2">
+              <i class="bi bi-cloud-arrow-up text-primary fs-5 mt-n1"></i>
+              <div>
+                <strong class="text-dark">Continuous Autosave:</strong> Every option you click is immediately saved to the server in the background. You can navigate freely between questions without losing selections.
+              </div>
+            </li>
+            <li class="d-flex align-items-start gap-2">
+              <i class="bi bi-grid-3x3-gap text-primary fs-5 mt-n1"></i>
+              <div>
+                <strong class="text-dark">Question Navigation:</strong> Use the "Previous" and "Next" buttons, or click any number on the Question Palette on the right side of the screen to jump directly to that question.
+              </div>
+            </li>
+            <li class="d-flex align-items-start gap-2">
+              <i class="bi bi-exclamation-triangle text-warning fs-5 mt-n1"></i>
+              <div>
+                <strong class="text-dark">Single Attempt Restriction:</strong> Retakes are strictly prohibited. Once you submit the assessment or the timer expires, the attempt cannot be reopened.
+              </div>
+            </li>
+            <li class="d-flex align-items-start gap-2">
+              <i class="bi bi-shield-exclamation text-danger fs-5 mt-n1"></i>
+              <div>
+                <strong class="text-dark">Integrity Monitoring:</strong> Tab switching and browser minimizes are tracked as audit signals. Please remain on the test page in full screen until completion.
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Start Action Form Card -->
+      <div class="card border shadow-sm rounded-3">
+        <div class="card-body p-4">
+          <form method="POST" action="{% url 'test_start' registration.registration_id %}" id="startTestForm">
+            {% csrf_token %}
+
+            <div class="form-check p-3 bg-light rounded-3 mb-4 border">
+              <input class="form-check-input ms-0 me-3" type="checkbox" id="acknowledgeRules" required style="width: 1.25rem; height: 1.25rem; cursor: pointer;">
+              <label class="form-check-label text-dark fw-semibold" for="acknowledgeRules" style="cursor: pointer;">
+                I have read, understood, and agreed to follow all the test instructions and examination conduct rules above.
+              </label>
+            </div>
+
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+              <a href="{% url 'candidate_dashboard' %}" class="btn btn-outline-secondary w-100 w-sm-auto">
+                <i class="bi bi-arrow-left me-1"></i> Return to Dashboard
+              </a>
+              <button type="submit" class="btn btn-hs-primary px-4 py-2 fw-bold w-100 w-sm-auto" id="startBtn" disabled>
+                <i class="bi bi-play-circle-fill me-2"></i> Start Assessment
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const checkbox = document.getElementById('acknowledgeRules');
+    const startBtn = document.getElementById('startBtn');
+
+    checkbox.addEventListener('change', function() {
+      startBtn.disabled = !this.checked;
+    });
+  });
+</script>
+{% endblock %}

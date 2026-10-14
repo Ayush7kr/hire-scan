@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Results Scorecard: {{ test.test_name }} — HireScan{% endblock %}
+
+{% block navbar %}
+<!-- Navbar -->
+<header>
+  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+    <div class="container">
+      <a class="hs-brand" href="{% if is_admin_view %}{% url 'admin_dashboard' %}{% else %}{% url 'candidate_dashboard' %}{% endif %}">
+        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+        HireScan <span class="badge {% if is_admin_view %}bg-primary-subtle text-primary border border-primary-subtle{% else %}bg-success-subtle text-success border border-success-subtle{% endif %} fs-6 ms-1">{% if is_admin_view %}Admin Evaluation{% else %}Candidate Scorecard{% endif %}</span>
+      </a>
+
+      <div class="ms-auto d-flex align-items-center gap-3">
+        {% if is_admin_view %}
+          <a href="{% url 'admin_test_attempts' test_id=test.test_id %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Back to Test Attempts
+          </a>
+        {% else %}
+          <span class="small text-muted d-none d-md-inline">Examinee: <strong>{{ candidate.name }}</strong> ({{ candidate.email }})</span>
+          <a href="{% url 'candidate_dashboard' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-speedometer2 me-1"></i> Dashboard
+          </a>
+          <a href="{% url 'candidate_logout' %}" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-box-arrow-right"></i> Logout
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small">
+      {% if is_admin_view %}
+        <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'test_list' %}" class="text-decoration-none">Tests</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'admin_test_attempts' test_id=test.test_id %}" class="text-decoration-none">Attempts</a></li>
+      {% else %}
+        <li class="breadcrumb-item"><a href="{% url 'candidate_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+      {% endif %}
+      <li class="breadcrumb-item active" aria-current="page">Scorecard</li>
+    </ol>
+  </nav>
+
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+
+      <!-- Pass / Fail Result Banner Card -->
+      <div class="card border shadow-sm rounded-3 mb-4 overflow-hidden">
+        <div class="card-body p-4 {% if attempt.is_passed %}bg-success-subtle border-start border-5 border-success{% else %}bg-danger-subtle border-start border-5 border-danger{% endif %}">
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+            <div>
+              <div class="d-flex align-items-center gap-2 mb-2">
+                {% if attempt.is_passed %}
+                  <span class="badge bg-success text-white px-3 py-2 fs-6">
+                    <i class="bi bi-trophy-fill me-1"></i> PASSED
+                  </span>
+                {% else %}
+                  <span class="badge bg-danger text-white px-3 py-2 fs-6">
+                    <i class="bi bi-x-circle-fill me-1"></i> DID NOT MEET CRITERIA
+                  </span>
+                {% endif %}
+                <span class="badge bg-white text-dark border">
+                  Submission: {{ attempt.submission_reason|default:"manual"|title }}
+                </span>
+              </div>
+              <h3 class="fw-bold mb-1 text-dark">{{ test.test_name }}</h3>
+              <p class="text-muted small mb-0">
+                Candidate: <strong>{{ candidate.name }}</strong> ({{ candidate.email }}) &bull; Finalized on {{ attempt.end_time|date:"M d, Y H:i" }}
+              </p>
+            </div>
+
+            <!-- Score Pill -->
+            <div class="text-md-end bg-white p-3 rounded-3 border shadow-sm text-center">
+              <div class="text-muted small">Total Score</div>
+              <div class="display-6 fw-bold {% if attempt.is_passed %}text-success{% else %}text-danger{% endif %} font-mono">
+                {{ attempt.score }} / {{ attempt.total_questions }}
+              </div>
+              <div class="small fw-semibold text-muted">Passing: {{ test.passing_marks }} marks</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Score Summary Metrics Grid -->
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+          <div class="card h-100 border shadow-sm rounded-3 text-center p-3">
+            <div class="text-muted small mb-1">Percentage</div>
+            <div class="fs-3 fw-bold text-dark font-mono">{{ attempt.percentage }}%</div>
+            <div class="progress mt-2" style="height: 6px;">
+              <div class="progress-bar {% if attempt.is_passed %}bg-success{% else %}bg-danger{% endif %}" style="width: {{ attempt.percentage }}%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+          <div class="card h-100 border shadow-sm rounded-3 text-center p-3">
+            <div class="text-muted small mb-1">Correct Answers</div>
+            <div class="fs-3 fw-bold text-success font-mono">
+              <i class="bi bi-check-circle me-1"></i>{{ attempt.correct_answers }}
+            </div>
+            <div class="small text-muted">Accuracy: {{ attempt.percentage }}%</div>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+          <div class="card h-100 border shadow-sm rounded-3 text-center p-3">
+            <div class="text-muted small mb-1">Incorrect Answers</div>
+            <div class="fs-3 fw-bold text-danger font-mono">
+              <i class="bi bi-x-circle me-1"></i>{{ attempt.incorrect_answers }}
+            </div>
+            <div class="small text-muted">No penalty applied</div>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+          <div class="card h-100 border shadow-sm rounded-3 text-center p-3">
+            <div class="text-muted small mb-1">Time Taken</div>
+            <div class="fs-3 fw-bold text-primary font-mono">
+              <i class="bi bi-stopwatch me-1"></i>{{ time_taken_formatted }}
+            </div>
+            <div class="small text-muted">Limit: {{ test.duration_minutes }}m</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Additional Details Row: Unanswered & Duration -->
+      <div class="card border shadow-sm rounded-3 mb-4">
+        <div class="card-body p-3">
+          <div class="row text-center small text-muted">
+            <div class="col-sm-4 border-end">
+              Unanswered Questions: <strong class="text-dark">{{ attempt.unanswered }}</strong>
+            </div>
+            <div class="col-sm-4 border-end">
+              Started At: <strong class="text-dark">{{ attempt.start_time|date:"H:i:s" }}</strong>
+            </div>
+            <div class="col-sm-4">
+              Submitted At: <strong class="text-dark">{{ attempt.end_time|date:"H:i:s" }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Topic-wise Performance Breakdown -->
+      <div class="card border shadow-sm rounded-3 mb-4">
+        <div class="card-header bg-white border-bottom py-3">
+          <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-bar-chart-line-fill text-primary me-2"></i>Topic-wise Performance Breakdown
+          </h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-4">Topic / Domain</th>
+                  <th class="text-center">Questions</th>
+                  <th class="text-center">Correct</th>
+                  <th class="text-center">Incorrect</th>
+                  <th class="text-center">Unanswered</th>
+                  <th class="text-center">Accuracy</th>
+                  <th class="pe-4 text-center">Evaluation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for topic in topic_performance %}
+                  <tr>
+                    <td class="ps-4 fw-semibold text-dark">{{ topic.topic }}</td>
+                    <td class="text-center">{{ topic.total }}</td>
+                    <td class="text-center text-success fw-bold">{{ topic.correct }}</td>
+                    <td class="text-center text-danger">{{ topic.incorrect }}</td>
+                    <td class="text-center text-muted">{{ topic.unanswered }}</td>
+                    <td class="text-center font-mono fw-semibold">{{ topic.accuracy }}%</td>
+                    <td class="pe-4 text-center">
+                      <span class="badge {{ topic.badge_class }} px-2 py-1">
+                        {{ topic.level }}
+                      </span>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                      No topic performance data available.
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recommended Improvement Areas -->
+      {% if topic_performance %}
+        <div class="card border shadow-sm rounded-3 mb-4">
+          <div class="card-header bg-white border-bottom py-3">
+            <h5 class="fw-bold mb-0 text-dark">
+              <i class="bi bi-lightbulb-fill text-warning me-2"></i>Curated Recommendations & Next Steps
+            </h5>
+          </div>
+          <div class="card-body p-4">
+            <div class="d-flex flex-column gap-3">
+              {% for topic in topic_performance %}
+                {% if topic.suggestions %}
+                  <div class="p-3 bg-light rounded-3 border">
+                    <h6 class="fw-bold text-dark mb-2">
+                      <span class="badge {{ topic.badge_class }} me-2">{{ topic.topic }}</span>
+                      Focus Recommended ({{ topic.accuracy }}% accuracy)
+                    </h6>
+                    <ul class="mb-0 text-secondary small ps-3">
+                      {% for tip in topic.suggestions %}
+                        <li>{{ tip }}</li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                {% endif %}
+              {% endfor %}
+
+              <div class="p-3 rounded-3 bg-primary-subtle text-primary border border-primary-subtle small">
+                <i class="bi bi-info-circle-fill me-1"></i>
+                HireScan evaluates technical depth across core competencies. The assessment evaluation has been securely recorded on the central server and communicated to your recruitment coordinator.
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Footer Action Buttons -->
+      <div class="d-flex justify-content-between align-items-center mb-5">
+        {% if is_admin_view %}
+          <a href="{% url 'admin_test_attempts' test_id=test.test_id %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Return to Attempts List
+          </a>
+          <a href="{% url 'admin_attempt_detail' attempt_id=attempt.attempt_id %}" class="btn btn-hs-primary fw-bold">
+            <i class="bi bi-shield-lock me-1"></i> View Full Admin Question Breakdown
+          </a>
+        {% else %}
+          <a href="{% url 'candidate_dashboard' %}" class="btn btn-hs-primary px-4 py-2 fw-bold">
+            <i class="bi bi-arrow-left me-1"></i> Return to Dashboard
+          </a>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

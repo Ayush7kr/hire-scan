@@ -98,6 +98,9 @@
           <a href="{% url 'question_list' test_id=test.test_id %}" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-patch-question me-1"></i> Question Bank ({{ bank_count }})
           </a>
+          <a href="{% url 'admin_test_attempts' test_id=test.test_id %}" class="btn btn-outline-dark btn-sm">
+            <i class="bi bi-person-workspace me-1"></i> Candidate Attempts
+          </a>
           <a href="{% url 'question_import' test_id=test.test_id %}" class="btn btn-outline-info btn-sm">
             <i class="bi bi-upload me-1"></i> Upload Questions CSV
           </a>
@@ -106,6 +109,7 @@
           </a>
         </div>
       </div>
+
 
       <!-- Quick Metrics Row -->
       <div class="row g-3 mb-4">

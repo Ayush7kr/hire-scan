@@ -157,7 +157,7 @@ What is the output of print(type([])) in Python 3?,<class 'list'>,<class 'tuple'
 
 ## 8. Running the Automated Test Suite
 
-HireScan includes a comprehensive automated test suite covering authentication, route authorization, database constraints, candidate imports, question bank sufficiency, and registration rules.
+HireScan includes a comprehensive automated test suite covering authentication, route authorization, database constraints, candidate imports, question bank sufficiency, registration rules, assessment engine workflows, server timer enforcement, autosave idempotency, scoring accuracy, and IDOR protection.
 
 Execute the test suite:
 ```bash
@@ -166,7 +166,7 @@ python manage.py test
 
 Current test results:
 ```
-Ran 48 tests in 22.182s
+Ran 78 tests in 34.435s
 OK
 ```
 
@@ -195,15 +195,25 @@ OK
   - Registration cancellation with completed attempt protection
   - Complete integration into the Administrator Dashboard with live metrics
   - 28 new automated tests (48 tests passing in total)
-- [ ] **Phase 3: Assessment Engine**
-  - Randomized question subset generator per candidate attempt
-  - Timed test execution interface with autosave and backend timestamp enforcement
-  - Resilient submission and server-side evaluation engine
-  - Instant scorecard and topic-wise performance breakdown
+- [x] **Phase 3: Assessment Engine Implementation (Completed)**
+  - Candidate dashboard with live assessment status and launch/resume/results routing
+  - Pre-assessment instructions briefing with test rules and acknowledgment (`/test/instructions/<registration_id>/`)
+  - Transactional attempt creation with atomic locking and single-attempt constraint enforcement (`/test/start/<registration_id>/`)
+  - One-time question randomization and stable 1..N order persistence across page reloads
+  - Split-pane examination interface with question navigation, countdown timer, and interactive question palette (`/test/take/<attempt_id>/`)
+  - Server-authoritative timer deadline validation (`start_time + duration`) on all requests
+  - Authenticated background answer autosave endpoint with live status indicators (`/test/autosave/<attempt_id>/`)
+  - Idempotent manual and timeout finalization (`/test/submit/<attempt_id>/`)
+  - Server-side evaluation service (`attempts/services.py`) computing score, percentage, pass/fail status, and time taken
+  - Candidate result scorecard with topic-wise performance breakdown and improvement tips (`/test/results/<attempt_id>/`)
+  - Strict answer key isolation (correct options never exposed to candidate in DOM or context)
+  - Administrator attempt monitoring and full question audit trail inspection (`/admin/tests/<test_id>/attempts/` and `/admin/tests/attempts/<attempt_id>/`)
+  - 30 new automated tests (78 tests passing in total)
 - [ ] **Phase 4: Analytics & Reporting**
-  - Topic-wise accuracy computation
+  - Topic-wise accuracy computation across cohort
   - Pass/fail distributions & top performers
   - CSV and PDF scorecard export
 - [ ] **Phase 5: Production Deployment & Hardening**
   - PostgreSQL adapter configuration
   - Docker containerization & static asset optimization
+

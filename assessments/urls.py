@@ -13,6 +13,8 @@ from assessments.views import (
     question_import,
     question_template_download,
     question_import_error_csv,
+    admin_test_attempts,
+    admin_attempt_detail,
 )
 
 urlpatterns = [
@@ -28,4 +30,7 @@ urlpatterns = [
     path('<uuid:test_id>/questions/import/', question_import, name='question_import'),
     path('<uuid:test_id>/questions/<uuid:question_id>/edit/', question_edit, name='question_edit'),
     path('<uuid:test_id>/questions/<uuid:question_id>/delete/', question_delete, name='question_delete'),
+    path('<uuid:test_id>/attempts/', admin_test_attempts, name='admin_test_attempts'),
+    path('attempts/<uuid:attempt_id>/', admin_attempt_detail, name='admin_attempt_detail'),
 ]
+
