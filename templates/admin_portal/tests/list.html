@@ -43,10 +43,29 @@
       <a href="{% url 'registration_list' %}" class="sidebar-nav-item">
         <i class="bi bi-card-checklist"></i> Test Registrations
       </a>
+
+      <div class="sidebar-heading mt-3">Analytics & Reports</div>
+      <a href="{% url 'analytics_test_summary' %}" class="sidebar-nav-item">
+        <i class="bi bi-bar-chart-steps"></i> Test Summaries
+      </a>
+      <a href="{% url 'analytics_candidate_performance' %}" class="sidebar-nav-item">
+        <i class="bi bi-person-lines-fill"></i> Candidate Performance
+      </a>
+      <a href="{% url 'analytics_question_analysis' %}" class="sidebar-nav-item">
+        <i class="bi bi-patch-question"></i> Question Analysis
+      </a>
+      <a href="{% url 'analytics_topic_performance' %}" class="sidebar-nav-item">
+        <i class="bi bi-diagram-3"></i> Topic Competency
+      </a>
+      <a href="{% url 'analytics_completion_report' %}" class="sidebar-nav-item">
+        <i class="bi bi-clock-history"></i> Completion Pipeline
+      </a>
+
       <div class="sidebar-heading mt-3">System</div>
       <a href="{% url 'admin_logout' %}" class="sidebar-nav-item text-danger">
         <i class="bi bi-box-arrow-right"></i> Logout
       </a>
+
     </nav>
   </aside>
 

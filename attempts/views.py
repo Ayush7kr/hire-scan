@@ -4,7 +4,7 @@ Test attempt and candidate assessment views.
 import json
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
@@ -395,3 +395,55 @@ def test_results(request, attempt_id):
         'is_admin_view': is_admin,
     }
     return render(request, 'candidate_portal/results.html', context)
+
+
+def attempt_scorecard_pdf(request, attempt_id):
+    """
+    Download official examinee scorecard as PDF.
+    Restricted to:
+      1) The authenticated candidate who owns the attempt.
+      2) An authenticated administrator.
+    """
+    admin_id = request.session.get('admin_id')
+    candidate_id = request.session.get('candidate_id')
+
+    if not admin_id and not candidate_id:
+        return redirect('candidate_login')
+
+    attempt = get_object_or_404(
+        TestAttempt.objects.select_related('registration__test', 'registration__candidate'),
+        attempt_id=attempt_id
+    )
+
+    is_admin = False
+    if admin_id:
+        try:
+            request.admin_user = Admin.objects.get(admin_id=admin_id)
+            is_admin = True
+        except Admin.DoesNotExist:
+            pass
+
+    if not is_admin:
+        if str(attempt.registration.candidate_id) != str(candidate_id):
+            return HttpResponseForbidden("You are not authorized to download this scorecard.")
+
+    # If still in progress, check if expired
+    if attempt.status == 'in_progress':
+        if attempt.is_expired:
+            evaluate_attempt(attempt, submission_reason='timeout')
+        else:
+            messages.warning(request, "Assessment must be finalized before downloading official scorecard.")
+            return redirect('test_take', attempt_id=attempt.attempt_id)
+
+    from analytics.pdf_export import generate_candidate_scorecard_pdf
+    pdf_bytes = generate_candidate_scorecard_pdf(attempt)
+
+    import re
+    safe_cand = re.sub(r'[^a-zA-Z0-9_-]', '_', attempt.registration.candidate.name)[:20]
+    safe_test = re.sub(r'[^a-zA-Z0-9_-]', '_', attempt.registration.test.test_name)[:20]
+    filename = f"HireScan_Scorecard_{safe_cand}_{safe_test}.pdf"
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+

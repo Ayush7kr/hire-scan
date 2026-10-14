@@ -12,6 +12,7 @@ urlpatterns = [
     path('admin/candidates/', include('candidates.urls')),
     path('admin/tests/', include('assessments.urls')),
     path('admin/registrations/', include('assessments.urls_registrations')),
+    path('admin/analytics/', include('analytics.urls')),
 
     # Candidate Portal & Authentication
     path('candidate/', include('accounts.urls_candidate')),
@@ -20,3 +21,4 @@ urlpatterns = [
     # Backward / convenience alias for dashboard
     path('dashboard/', include('analytics.urls')),
 ]
+

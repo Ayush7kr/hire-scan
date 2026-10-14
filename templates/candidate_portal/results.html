@@ -18,8 +18,10 @@
           <a href="{% url 'admin_test_attempts' test_id=test.test_id %}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left me-1"></i> Back to Test Attempts
           </a>
-        {% else %}
           <span class="small text-muted d-none d-md-inline">Examinee: <strong>{{ candidate.name }}</strong> ({{ candidate.email }})</span>
+          <a href="{% url 'attempt_scorecard_pdf' attempt_id=attempt.attempt_id %}" class="btn btn-outline-danger btn-sm fw-bold">
+            <i class="bi bi-file-earmark-pdf-fill me-1"></i> PDF Scorecard
+          </a>
           <a href="{% url 'candidate_dashboard' %}" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-speedometer2 me-1"></i> Dashboard
           </a>
@@ -28,6 +30,7 @@
           </a>
         {% endif %}
       </div>
+
     </div>
   </nav>
 </header>
@@ -234,17 +237,25 @@
       {% endif %}
 
       <!-- Footer Action Buttons -->
-      <div class="d-flex justify-content-between align-items-center mb-5">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-5">
         {% if is_admin_view %}
           <a href="{% url 'admin_test_attempts' test_id=test.test_id %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left me-1"></i> Return to Attempts List
           </a>
-          <a href="{% url 'admin_attempt_detail' attempt_id=attempt.attempt_id %}" class="btn btn-hs-primary fw-bold">
-            <i class="bi bi-shield-lock me-1"></i> View Full Admin Question Breakdown
-          </a>
+          <div class="d-flex gap-2">
+            <a href="{% url 'attempt_scorecard_pdf' attempt_id=attempt.attempt_id %}" class="btn btn-outline-danger fw-bold">
+              <i class="bi bi-file-earmark-pdf-fill me-1"></i> Download Scorecard PDF
+            </a>
+            <a href="{% url 'admin_attempt_detail' attempt_id=attempt.attempt_id %}" class="btn btn-hs-primary fw-bold">
+              <i class="bi bi-shield-lock me-1"></i> View Full Admin Question Breakdown
+            </a>
+          </div>
         {% else %}
-          <a href="{% url 'candidate_dashboard' %}" class="btn btn-hs-primary px-4 py-2 fw-bold">
+          <a href="{% url 'candidate_dashboard' %}" class="btn btn-outline-secondary px-4 py-2 fw-bold">
             <i class="bi bi-arrow-left me-1"></i> Return to Dashboard
+          </a>
+          <a href="{% url 'attempt_scorecard_pdf' attempt_id=attempt.attempt_id %}" class="btn btn-danger px-4 py-2 fw-bold">
+            <i class="bi bi-file-earmark-pdf-fill me-1"></i> Download Official Scorecard (PDF)
           </a>
         {% endif %}
       </div>
@@ -253,3 +264,4 @@
   </div>
 </div>
 {% endblock %}
+

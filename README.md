@@ -166,7 +166,7 @@ python manage.py test
 
 Current test results:
 ```
-Ran 78 tests in 34.435s
+Ran 99 tests in 103.595s
 OK
 ```
 
@@ -209,11 +209,39 @@ OK
   - Strict answer key isolation (correct options never exposed to candidate in DOM or context)
   - Administrator attempt monitoring and full question audit trail inspection (`/admin/tests/<test_id>/attempts/` and `/admin/tests/attempts/<attempt_id>/`)
   - 30 new automated tests (78 tests passing in total)
-- [ ] **Phase 4: Analytics & Reporting**
-  - Topic-wise accuracy computation across cohort
-  - Pass/fail distributions & top performers
-  - CSV and PDF scorecard export
+- [x] **Phase 4: Analytics and Reporting Implementation (Completed)**
+  - Executive Administrator Analytics Dashboard with real-time database metrics and live filtering by test, status, and date range (`/admin/analytics/dashboard/`)
+  - Six interactive, responsive Chart.js visualisations: Daily Attempts Timeline, Pass/Fail Distribution, Average Score by Assessment, Score Distribution Histograms, Topic-Wise Competency, and Assessment Pipeline Funnels
+  - Test Summary Reports with cohort metrics, score distributions, and individual test deep dives (`/admin/analytics/tests/` and `/admin/analytics/tests/<test_id>/`)
+  - Candidate Performance Reports with multi-field filtering, pagination, and cohort percentiles (`/admin/analytics/candidates/`)
+  - Question-Level Item Discrimination Reports with strict assigned-attempt accuracy denominators (`/admin/analytics/questions/`)
+  - Topic-Wise Performance & Improvement Reports with proficiency classifications (`/admin/analytics/topics/`)
+  - Test Completion and Attempt-Pattern Reports with mutually exclusive funnel categorization and activity audit logs (`/admin/analytics/completion/`)
+  - Standard competition ranking and symmetric percentile formula ($\frac{B + 0.5 \times E}{N} \times 100$)
+  - Official Candidate Scorecard PDF Export powered by ReportLab with strict answer-key confidentiality (`/test/results/<attempt_id>/pdf/`)
+  - 5 Batch CSV Exports with comprehensive spreadsheet formula injection protection (`=`, `+`, `-`, `@`, `\t`, `\r`)
+  - 21 new automated tests (99 tests passing in total)
 - [ ] **Phase 5: Production Deployment & Hardening**
   - PostgreSQL adapter configuration
   - Docker containerization & static asset optimization
+
+---
+
+## 10. Analytics & Reporting Architecture (Phase 4)
+
+### Metric Definitions & Denominators
+
+| Metric | Denominator | Definition / Mathematical Formula |
+| :--- | :--- | :--- |
+| **Pass Rate** | Finalized Attempts | $\frac{\text{Passed Finalized Attempts}}{\text{Finalized Attempts (Completed + Timed Out)}} \times 100$ |
+| **Completion Rate** | Total Test Registrations | $\frac{\text{Finalized Attempts}}{\text{Total Test Registrations}} \times 100$ |
+| **Question Accuracy** | Assigned Finalized Occurrences | $\frac{\text{Correct Responses}}{\text{Attempts where Question was Assigned and Finalized}} \times 100$ *(Note: Total registrations or bank size is NOT used)* |
+| **Candidate Percentile** | Test Cohort Size ($N$) | $\frac{B + 0.5 \times E}{N} \times 100$ *(where $B$ is strictly lower scores, $E$ is tied scores)* |
+| **Candidate Rank** | Test Cohort Size ($N$) | Standard competition ranking: $1 + \text{Count}(s > s_{\text{cand}})$ with deterministic secondary ordering |
+
+### Security & Compliance Controls
+1. **Spreadsheet Formula Injection Defense:** All exported CSV cells are scrubbed; any values starting with `=`, `+`, `-`, `@`, `\t`, or `\r` are prepended with an apostrophe `'` to prevent remote command execution in Microsoft Excel and LibreOffice Calc.
+2. **Answer Key Confidentiality:** Candidate-facing scorecards and exported PDFs display topic competency and performance metrics, but strictly withhold correct answer keys to maintain question bank integrity.
+3. **Strict Authorization:** All reporting and export endpoints require authenticated administrator sessions (`@admin_required`); candidate PDF downloads verify ownership (`candidate_id`) on the server.
+4. **Read-Only Reporting:** All reporting calculations operate purely as read-only queries (`select_related`, `prefetch_related`, `aggregate`) without mutating historical scores or attempts.
 

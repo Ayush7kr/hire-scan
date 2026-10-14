@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Test Summary Reports — HireScan Admin{% endblock %}
+
+{% block navbar %}
+<header>
+  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+    <div class="container-fluid px-lg-4">
+      <a class="hs-brand" href="{% url 'admin_dashboard' %}">
+        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+        HireScan <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-6 ms-1">Admin Analytics</span>
+      </a>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <span class="small text-muted d-none d-md-inline">Signed in as <strong>{{ request.admin_user.name }}</strong></span>
+        <a href="{% url 'admin_logout' %}" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+      </div>
+    </div>
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex admin-layout-wrapper">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-heading">Management</div>
+    <nav class="d-flex flex-column">
+      <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </a>
+      <a href="{% url 'candidate_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-people"></i> Candidates
+      </a>
+      <a href="{% url 'candidate_import' %}" class="sidebar-nav-item">
+        <i class="bi bi-file-earmark-arrow-up"></i> Candidate Imports
+      </a>
+      <a href="{% url 'test_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-journal-text"></i> Tests
+      </a>
+      <a href="{% url 'registration_list' %}" class="sidebar-nav-item">
+        <i class="bi bi-card-checklist"></i> Test Registrations
+      </a>
+
+      <div class="sidebar-heading mt-3">Analytics & Reports</div>
+      <a href="{% url 'analytics_test_summary' %}" class="sidebar-nav-item active">
+        <i class="bi bi-bar-chart-steps"></i> Test Summaries
+      </a>
+      <a href="{% url 'analytics_candidate_performance' %}" class="sidebar-nav-item">
+        <i class="bi bi-person-lines-fill"></i> Candidate Performance
+      </a>
+      <a href="{% url 'analytics_question_analysis' %}" class="sidebar-nav-item">
+        <i class="bi bi-patch-question"></i> Question Analysis
+      </a>
+      <a href="{% url 'analytics_topic_performance' %}" class="sidebar-nav-item">
+        <i class="bi bi-diagram-3"></i> Topic Competency
+      </a>
+      <a href="{% url 'analytics_completion_report' %}" class="sidebar-nav-item">
+        <i class="bi bi-clock-history"></i> Completion Pipeline
+      </a>
+
+      <div class="sidebar-heading mt-3">System</div>
+      <a href="{% url 'admin_logout' %}" class="sidebar-nav-item text-danger">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="admin-content">
+    <div class="container-fluid px-0">
+      <!-- Breadcrumb -->
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb small mb-2">
+          <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Test Summary Reports</li>
+        </ol>
+      </nav>
+
+      <!-- Page Header -->
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+        <div>
+          <h2 class="fw-bold mb-1">Assessment Performance Summaries</h2>
+          <p class="text-muted small mb-0">High-level comparison across tests, completion rates, and examinee scoring trends.</p>
+        </div>
+
+        <div class="d-flex gap-2">
+          <a href="{% url 'analytics_export_tests' %}" class="btn btn-outline-success btn-sm fw-bold">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export All Summaries (CSV)
+          </a>
+        </div>
+      </div>
+
+      <!-- Test Summaries Table -->
+      <div class="card border-0 shadow-sm rounded-3">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Assessment Name</th>
+                <th>Status</th>
+                <th>Bank Health</th>
+                <th>Registered</th>
+                <th>Started</th>
+                <th>Completed</th>
+                <th>Timed Out</th>
+                <th>Avg Score</th>
+                <th>Pass Rate</th>
+                <th class="pe-3 text-end">Report</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in summaries %}
+                <tr>
+                  <td class="ps-3">
+                    <a href="{% url 'analytics_test_detail' test_id=item.test.test_id %}" class="fw-bold text-dark text-decoration-none">
+                      {{ item.test.test_name }}
+                    </a>
+                    <div class="small text-muted">{{ item.test.duration_minutes }} mins &bull; {{ item.test.total_questions }} MCQs &bull; Pass: {{ item.test.passing_marks }}</div>
+                  </td>
+                  <td>
+                    {% if item.test.is_active %}
+                      <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                    {% else %}
+                      <span class="badge bg-secondary-subtle text-secondary border">Inactive</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if item.is_sufficient %}
+                      <span class="badge bg-success-subtle text-success border border-success-subtle small">
+                        {{ item.bank_count }} Qs (Sufficient)
+                      </span>
+                    {% else %}
+                      <span class="badge bg-danger-subtle text-danger border border-danger-subtle small">
+                        {{ item.bank_count }}/{{ item.test.total_questions }} Qs (Insufficient)
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td class="font-mono">{{ item.total_registered }}</td>
+                  <td class="font-mono">{{ item.started }}</td>
+                  <td class="font-mono text-success fw-bold">{{ item.completed }}</td>
+                  <td class="font-mono text-danger">{{ item.expired }}</td>
+                  <td class="font-mono">{{ item.avg_percentage }}%</td>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="font-mono fw-bold">{{ item.pass_rate }}%</span>
+                      <div class="progress flex-grow-1" style="height: 6px; min-width: 50px;">
+                        <div class="progress-bar bg-success" style="width: {{ item.pass_rate }}%"></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="pe-3 text-end">
+                    <a href="{% url 'analytics_test_detail' test_id=item.test.test_id %}" class="btn btn-outline-primary btn-sm">
+                      <i class="bi bi-file-earmark-bar-graph me-1"></i> Deep Dive
+                    </a>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="10" class="text-center py-5 text-muted">
+                    No assessment tests configured yet.
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+{% endblock %}

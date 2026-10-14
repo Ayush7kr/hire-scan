@@ -10,4 +10,6 @@ urlpatterns = [
     path('autosave/<uuid:attempt_id>/', views.test_autosave, name='test_autosave'),
     path('submit/<uuid:attempt_id>/', views.test_submit, name='test_submit'),
     path('results/<uuid:attempt_id>/', views.test_results, name='test_results'),
+    path('results/<uuid:attempt_id>/pdf/', views.attempt_scorecard_pdf, name='attempt_scorecard_pdf'),
 ]
+
