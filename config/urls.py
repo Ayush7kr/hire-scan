@@ -2,8 +2,13 @@
 URL configuration for HireScan project.
 """
 from django.urls import path, include
+from config.views import health_check
 
 urlpatterns = [
+    # Health checks for container orchestration and monitoring
+    path('health/', health_check, name='health_check'),
+    path('healthz/', health_check, name='healthz_check'),
+
     # Public homepage
     path('', include('accounts.urls_public')),
 

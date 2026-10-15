@@ -4,8 +4,8 @@
 {% block title %}Executive Analytics Dashboard — HireScan Admin{% endblock %}
 
 {% block extra_head %}
-<!-- Chart.js 4.4 CDN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- Chart.js 4.4 Local Static Bundle -->
+<script src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
 {% endblock %}
 
 {% block navbar %}
