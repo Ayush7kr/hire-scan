@@ -166,7 +166,7 @@ python manage.py test
 
 Current test results:
 ```
-Ran 111 tests in 58.915s
+Ran 116 tests in 59.660s
 OK
 ```
 

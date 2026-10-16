@@ -209,20 +209,29 @@ SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD', 'False' if DEBUG else 'Tr
 # ─────────────────────────────────────────────────────────────────────────────
 # 11. Email & Candidate Authentication Settings
 # ─────────────────────────────────────────────────────────────────────────────
-if DEBUG and not os.getenv('EMAIL_BACKEND'):
+env_email_backend = os.getenv('EMAIL_BACKEND', '').strip()
+if env_email_backend:
+    EMAIL_BACKEND = env_email_backend
+elif DEBUG:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 else:
-    EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1')
 EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('true', '1')
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '').strip()
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '').strip()
 EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', 10))
 
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'HireScan <noreply@hirescan.local>')
+# Align default sender with authenticated SMTP user if provided
+if EMAIL_HOST_USER:
+    default_from_addr = f'HireScan <{EMAIL_HOST_USER}>'
+else:
+    default_from_addr = 'HireScan <noreply@hirescan.local>'
+
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', default_from_addr)
 
 # OTP Authentication Settings
 OTP_EXPIRY_MINUTES = int(os.getenv('OTP_EXPIRY_MINUTES', 5))

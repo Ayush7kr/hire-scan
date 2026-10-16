@@ -1,8 +1,11 @@
 import uuid
+import smtplib
+from unittest.mock import patch
 from datetime import timedelta
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
+from django.core import mail
 from django.contrib.auth.hashers import check_password
 
 from accounts.models import Admin, Candidate, OTPVerification, ActivityLog
@@ -239,6 +242,115 @@ class CandidateAuthenticationTests(TestCase):
         response = self.client.get(reverse('candidate_dashboard'))
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('candidate_login'), response.url)
+
+    def test_send_otp_email_dispatch_and_outbox_content(self):
+        """Successful OTP generation dispatches an email with subject, body, and recipient."""
+        mail.outbox.clear()
+        response = self.client.post(reverse('candidate_send_otp'), {
+            'email': 'alice@candidate.local'
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+
+        # Verify email dispatched to outbox
+        self.assertEqual(len(mail.outbox), 1)
+        sent_email = mail.outbox[0]
+        self.assertEqual(sent_email.subject, 'HireScan — Your Login OTP')
+        self.assertEqual(sent_email.to, ['alice@candidate.local'])
+        self.assertIn('one-time login code is:', sent_email.body)
+        self.assertIn('expires in', sent_email.body)
+
+    @patch('accounts.views.send_mail')
+    def test_send_otp_smtp_failure_handling(self, mock_send_mail):
+        """When SMTP dispatch fails, user gets generic error and unsent OTP is deleted."""
+        mock_send_mail.side_effect = smtplib.SMTPException("SMTP connection refused")
+        response = self.client.post(reverse('candidate_send_otp'), {
+            'email': 'alice@candidate.local'
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertFalse(data['success'])
+        self.assertIn('Unable to deliver verification code', data['error'])
+
+        # Undelivered OTP record must be deleted
+        self.assertEqual(OTPVerification.objects.filter(candidate=self.candidate).count(), 0)
+
+        # Audit log must record failure
+        self.assertTrue(
+            ActivityLog.objects.filter(
+                candidate=self.candidate,
+                activity_type='otp_delivery_failed'
+            ).exists()
+        )
+
+    def test_send_otp_resend_cooldown(self):
+        """Requesting OTP again within cooldown period (60s) is rejected."""
+        # First request succeeds
+        resp1 = self.client.post(reverse('candidate_send_otp'), {
+            'email': 'alice@candidate.local'
+        })
+        self.assertTrue(resp1.json()['success'])
+
+        # Immediate second request fails with cooldown message
+        resp2 = self.client.post(reverse('candidate_send_otp'), {
+            'email': 'alice@candidate.local'
+        })
+        self.assertEqual(resp2.status_code, 200)
+        data2 = resp2.json()
+        self.assertFalse(data2['success'])
+        self.assertIn('Please wait', data2['error'])
+
+    def test_candidate_verify_otp_max_attempts_lockout(self):
+        """Exceeding maximum invalid attempts (3) locks out the OTP record."""
+        otp_record = OTPVerification(
+            candidate=self.candidate,
+            expires_at=timezone.now() + timedelta(minutes=5)
+        )
+        otp_record.set_otp("123456")
+        otp_record.save()
+
+        session = self.client.session
+        session['otp_email'] = self.candidate.email
+        session.save()
+
+        # Attempts 1 and 2
+        for i in range(1, 3):
+            resp = self.client.post(reverse('candidate_verify_otp'), {'otp': '000000'})
+            self.assertFalse(resp.json()['success'])
+            self.assertIn('attempt(s) remaining', resp.json()['error'])
+
+        # Attempt 3 reaches limit
+        resp3 = self.client.post(reverse('candidate_verify_otp'), {'otp': '000000'})
+        self.assertFalse(resp3.json()['success'])
+        self.assertIn('Too many invalid attempts', resp3.json()['error'])
+
+        otp_record.refresh_from_db()
+        self.assertTrue(otp_record.is_used)
+
+        # Attempt 4 after lockout
+        resp4 = self.client.post(reverse('candidate_verify_otp'), {'otp': '123456'})
+        self.assertFalse(resp4.json()['success'])
+
+    def test_send_otp_invalidates_previous_unused_otps(self):
+        """Requesting a new OTP after cooldown marks previous unused OTPs as used."""
+        # First OTP
+        self.client.post(reverse('candidate_send_otp'), {'email': 'alice@candidate.local'})
+        first_otp = OTPVerification.objects.filter(candidate=self.candidate).first()
+        self.assertFalse(first_otp.is_used)
+
+        # Simulate cooldown passage
+        first_otp.created_at = timezone.now() - timedelta(seconds=70)
+        first_otp.save()
+
+        # Second OTP
+        self.client.post(reverse('candidate_send_otp'), {'email': 'alice@candidate.local'})
+        first_otp.refresh_from_db()
+        self.assertTrue(first_otp.is_used)
+
+        # New unused OTP exists
+        active_otps = OTPVerification.objects.filter(candidate=self.candidate, is_used=False)
+        self.assertEqual(active_otps.count(), 1)
 
 
 class DatabaseIntegrityAndConstraintsTests(TestCase):

@@ -3,6 +3,7 @@ Views for authentication: admin login, candidate OTP login, logout, and homepage
 """
 import secrets
 import json
+import logging
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.utils import timezone
@@ -12,6 +13,8 @@ from django.views.decorators.http import require_http_methods
 from datetime import timedelta
 
 from accounts.models import Admin, Candidate, OTPVerification, ActivityLog
+
+logger = logging.getLogger(__name__)
 
 
 # ──────────────────────────── Public Homepage ────────────────────────────
@@ -144,10 +147,19 @@ def candidate_send_otp(request):
             recipient_list=[candidate.email],
             fail_silently=False,
         )
-    except Exception:
-        # In development with console backend this won't fail,
-        # but handle gracefully for production
-        pass
+    except Exception as exc:
+        logger.error("Failed to deliver OTP email to candidate %s: %s", candidate.email, exc)
+        # Invalidate/delete the undelivered OTP so it cannot be used or cause cooldown lockouts
+        otp_record.delete()
+        ActivityLog.objects.create(
+            candidate=candidate,
+            activity_type='otp_delivery_failed',
+            activity_details=f'Failed to deliver OTP email to {candidate.email}'
+        )
+        return JsonResponse({
+            'success': False,
+            'error': 'Unable to deliver verification code at this time. Please check your email configuration or try again shortly.'
+        })
 
     # Store candidate email in session for OTP verification step
     request.session['otp_email'] = email
