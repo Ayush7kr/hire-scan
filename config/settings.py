@@ -9,11 +9,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
 
-# Load environment variables from .env file if present
-load_dotenv()
-
 # Build paths inside the project
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file if present
+load_dotenv(BASE_DIR / '.env')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Core Security & Environment Detection
@@ -223,6 +223,8 @@ EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1')
 EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('true', '1')
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '').strip()
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '').strip()
+if 'smtp.gmail.com' in EMAIL_HOST:
+    EMAIL_HOST_PASSWORD = EMAIL_HOST_PASSWORD.replace(' ', '')
 EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', 10))
 
 # Align default sender with authenticated SMTP user if provided
