@@ -352,6 +352,63 @@ class CandidateAuthenticationTests(TestCase):
         active_otps = OTPVerification.objects.filter(candidate=self.candidate, is_used=False)
         self.assertEqual(active_otps.count(), 1)
 
+    def test_successive_otp_requests_old_code_rejected_new_code_accepted(self):
+        """When an OTP is superseded by a newer request, old code is rejected with helpful message and new code succeeds."""
+        import re
+        mail.outbox.clear()
+
+        # Step 1: Request first OTP
+        resp1 = self.client.post(reverse('candidate_send_otp'), {'email': 'alice@candidate.local'})
+        self.assertTrue(resp1.json()['success'])
+        self.assertEqual(len(mail.outbox), 1)
+        code1 = re.search(r'one-time login code is:\s*(\d{6})', mail.outbox[0].body).group(1)
+
+        # Age the first OTP record so cooldown passes
+        first_otp = OTPVerification.objects.filter(candidate=self.candidate).first()
+        first_otp.created_at = timezone.now() - timedelta(seconds=65)
+        first_otp.save()
+
+        # Step 2: Request second OTP
+        resp2 = self.client.post(reverse('candidate_send_otp'), {'email': 'alice@candidate.local'})
+        self.assertTrue(resp2.json()['success'])
+        self.assertEqual(len(mail.outbox), 2)
+        code2 = re.search(r'one-time login code is:\s*(\d{6})', mail.outbox[1].body).group(1)
+        self.assertNotEqual(code1, code2)
+
+        # Step 3: Attempt verification with old (superseded) code1
+        verify_resp_old = self.client.post(reverse('candidate_verify_otp'), {'otp': code1})
+        self.assertEqual(verify_resp_old.status_code, 200)
+        old_data = verify_resp_old.json()
+        self.assertFalse(old_data['success'])
+        self.assertIn('replaced by a newer OTP request', old_data['error'])
+
+        # Step 4: Verify with current code2 succeeds
+        verify_resp_new = self.client.post(reverse('candidate_verify_otp'), {'otp': code2})
+        self.assertEqual(verify_resp_new.status_code, 200)
+        new_data = verify_resp_new.json()
+        self.assertTrue(new_data['success'])
+        self.assertEqual(self.client.session.get('user_role'), 'candidate')
+
+    def test_cooldown_enforced_even_if_previous_otp_was_used(self):
+        """Cooldown window (60s) applies even if the previous OTP was already verified/used."""
+        import re
+        mail.outbox.clear()
+
+        # Send and successfully verify OTP
+        self.client.post(reverse('candidate_send_otp'), {'email': 'alice@candidate.local'})
+        code = re.search(r'one-time login code is:\s*(\d{6})', mail.outbox[0].body).group(1)
+        self.client.post(reverse('candidate_verify_otp'), {'otp': code})
+
+        # OTP is now used
+        used_otp = OTPVerification.objects.filter(candidate=self.candidate).first()
+        self.assertTrue(used_otp.is_used)
+
+        # Immediate repeat request must be blocked by cooldown
+        resp_blocked = self.client.post(reverse('candidate_send_otp'), {'email': 'alice@candidate.local'})
+        self.assertFalse(resp_blocked.json()['success'])
+        self.assertIn('Please wait', resp_blocked.json()['error'])
+
+
 
 class DatabaseIntegrityAndConstraintsTests(TestCase):
     """Test suite validating database constraints from the approved ER diagram."""

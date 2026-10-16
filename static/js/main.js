@@ -108,15 +108,18 @@ document.addEventListener('DOMContentLoaded', function () {
             const otpTargetEmail = document.getElementById('otpTargetEmail');
             if (otpTargetEmail) otpTargetEmail.innerText = email;
             const otpCodeInput = document.getElementById('otpCode');
-            if (otpCodeInput) otpCodeInput.focus();
+            if (otpCodeInput) {
+              otpCodeInput.value = '';
+              otpCodeInput.focus();
+            }
           }
           startCooldown(60);
         } else {
-          showAlert(data.error || 'Failed to send OTP.');
+          showAlert(data.error || 'Failed to send OTP.', true);
         }
       })
       .catch(err => {
-        showAlert('Network or server error while sending OTP.');
+        showAlert('Network or server error while sending OTP.', true);
       })
       .finally(() => {
         if (submitBtn) {
@@ -135,7 +138,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const submitBtn = verifyOtpForm.querySelector('button[type="submit"]');
 
       if (!otp) {
-        showAlert('Please enter the 6-digit OTP code.');
+        showAlert('Please enter the 6-digit OTP code.', true);
         return;
       }
 
@@ -160,11 +163,11 @@ document.addEventListener('DOMContentLoaded', function () {
           showAlert('Verification successful! Redirecting...', false);
           window.location.href = data.redirect || '/test/dashboard/';
         } else {
-          showAlert(data.error || 'Invalid OTP code.');
+          showAlert(data.error || 'Invalid OTP code.', true);
         }
       })
       .catch(err => {
-        showAlert('Network or server error during verification.');
+        showAlert('Network or server error during verification.', true);
       })
       .finally(() => {
         if (submitBtn) {
@@ -195,15 +198,20 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(res => res.json())
       .then(data => {
         if (data.success) {
-          showAlert('New OTP sent to your email.', false);
+          showAlert(data.message || 'A new verification code has been sent to your email. Previous codes are now invalid.', false);
           startCooldown(60);
+          const otpCodeInput = document.getElementById('otpCode');
+          if (otpCodeInput) {
+            otpCodeInput.value = '';
+            otpCodeInput.focus();
+          }
         } else {
-          showAlert(data.error || 'Failed to resend OTP.');
+          showAlert(data.error || 'Failed to resend OTP.', true);
           resendOtpBtn.disabled = false;
         }
       })
       .catch(err => {
-        showAlert('Error requesting new OTP.');
+        showAlert('Error requesting new OTP.', true);
         resendOtpBtn.disabled = false;
       });
     });

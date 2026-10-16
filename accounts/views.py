@@ -3,6 +3,7 @@ Views for authentication: admin login, candidate OTP login, logout, and homepage
 """
 import secrets
 import json
+import math
 import logging
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
@@ -104,20 +105,20 @@ def candidate_send_otp(request):
             'message': 'If an account exists with this email, an OTP has been sent.'
         })
 
-    # Check resend cooldown
+    # Check resend cooldown on any recently generated OTP for this candidate
     recent_otp = OTPVerification.objects.filter(
         candidate=candidate,
-        is_used=False,
         created_at__gte=timezone.now() - timedelta(seconds=settings.OTP_RESEND_COOLDOWN_SECONDS)
-    ).first()
+    ).order_by('-created_at').first()
 
     if recent_otp:
         remaining = settings.OTP_RESEND_COOLDOWN_SECONDS - (
             timezone.now() - recent_otp.created_at
         ).total_seconds()
+        wait_seconds = max(1, int(math.ceil(remaining)))
         return JsonResponse({
             'success': False,
-            'error': f'Please wait {int(remaining)} seconds before requesting a new OTP.'
+            'error': f'Please wait {wait_seconds} seconds before requesting a new OTP.'
         })
 
     # Invalidate previous unused OTPs
@@ -138,10 +139,12 @@ def candidate_send_otp(request):
 
     # Send OTP via email
     try:
+        local_time_str = timezone.localtime(timezone.now()).strftime('%I:%M:%S %p')
         send_mail(
             subject='HireScan — Your Login OTP',
             message=f'Your one-time login code is: {otp_code}\n\n'
-                    f'This code expires in {settings.OTP_EXPIRY_MINUTES} minutes.\n\n'
+                    f'Generated at: {local_time_str} (expires in {settings.OTP_EXPIRY_MINUTES} minutes).\n\n'
+                    f'Note: If you requested multiple codes, only this latest code is valid.\n\n'
                     f'If you did not request this code, please ignore this email.',
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[candidate.email],
@@ -198,6 +201,18 @@ def candidate_verify_otp(request):
     ).order_by('-created_at').first()
 
     if not otp_record:
+        # Check if the code matches a recently superseded OTP to give helpful feedback
+        superseded_records = OTPVerification.objects.filter(
+            candidate=candidate,
+            is_used=True,
+            created_at__gte=timezone.now() - timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
+        ).order_by('-created_at')
+        for superseded in superseded_records:
+            if superseded.check_otp(otp_code):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'This code has expired or was replaced by a newer OTP request. Please enter the latest code sent to your email.'
+                })
         return JsonResponse({'success': False, 'error': 'No active OTP found. Please request a new one.'})
 
     # Check if expired
@@ -238,6 +253,19 @@ def candidate_verify_otp(request):
         # Increment attempt counter
         otp_record.attempts += 1
         otp_record.save()
+
+        # Check if code matched an older superseded code
+        superseded_records = OTPVerification.objects.filter(
+            candidate=candidate,
+            is_used=True,
+            created_at__gte=timezone.now() - timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
+        ).exclude(otp_id=otp_record.otp_id)
+        for superseded in superseded_records:
+            if superseded.check_otp(otp_code):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'This code was replaced by a newer OTP request. Please check your inbox for the most recent code.'
+                })
 
         remaining = settings.OTP_MAX_ATTEMPTS - otp_record.attempts
         error_msg = 'Invalid OTP.'
