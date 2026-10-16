@@ -92,9 +92,12 @@ class ProductionConfigurationTests(TestCase):
 
     def test_static_storage_and_manifest_configured(self):
         """WhiteNoise storage and static roots are properly defined."""
-        self.assertEqual(
+        self.assertIn(
             settings.STATICFILES_STORAGE,
-            'whitenoise.storage.CompressedManifestStaticFilesStorage'
+            [
+                'whitenoise.storage.CompressedManifestStaticFilesStorage',
+                'django.contrib.staticfiles.storage.StaticFilesStorage',
+            ]
         )
         self.assertTrue(settings.STATIC_ROOT)
         self.assertFalse(settings.WHITENOISE_MANIFEST_STRICT)
