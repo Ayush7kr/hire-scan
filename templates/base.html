@@ -1,11 +1,27 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" data-bs-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}HireScan — Test Management Tool{% endblock %}</title>
   <meta name="description" content="HireScan helps organizations manage candidate registrations, conduct secure technical assessments, and evaluate performance through detailed analytics.">
+
+  <!-- Early Theme Script to prevent flash of wrong theme -->
+  <script>
+    (function () {
+      try {
+        const savedTheme = localStorage.getItem('hirescan_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        document.documentElement.setAttribute('data-bs-theme', savedTheme);
+      } catch (e) {}
+    })();
+  </script>
+
+  <!-- Typography: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <!-- Bootstrap 5 CSS & Bootstrap Icons (Local Static) -->
   <link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}">
@@ -27,9 +43,14 @@
           <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
           HireScan
         </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#hsNavbarNav" aria-controls="hsNavbarNav" aria-expanded="false" aria-label="Toggle navigation">
-          <span class="navbar-toggler-icon"></span>
-        </button>
+
+        <div class="d-flex align-items-center gap-2 d-lg-none">
+          <!-- Mobile Theme Toggle -->
+          {% include 'includes/theme_toggle.html' %}
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#hsNavbarNav" aria-controls="hsNavbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+        </div>
 
         <div class="collapse navbar-collapse" id="hsNavbarNav">
           <ul class="navbar-nav ms-auto align-items-lg-center gap-2">
@@ -48,12 +69,19 @@
             <li class="nav-item">
               <a class="hs-nav-link" href="{% url 'homepage' %}#contact">Contact</a>
             </li>
+
+            <!-- Desktop Theme Toggle -->
+            <li class="nav-item d-none d-lg-block ms-lg-1">
+              {% include 'includes/theme_toggle.html' %}
+            </li>
+
+            <!-- Sign In Role Selector Dropdown -->
             <li class="nav-item ms-lg-2">
               <div class="dropdown">
                 <button class="btn btn-hs-primary dropdown-toggle py-1 px-3" type="button" id="loginDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                   <i class="bi bi-person-fill-lock me-1"></i> Sign In
                 </button>
-                <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="loginDropdown">
+                <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="loginDropdown">
                   <li><a class="dropdown-item py-2" href="{% url 'admin_login' %}"><i class="bi bi-shield-lock me-2 text-primary"></i> Administrator Portal</a></li>
                   <li><hr class="dropdown-divider"></li>
                   <li><a class="dropdown-item py-2" href="{% url 'candidate_login' %}"><i class="bi bi-person-badge me-2 text-success"></i> Candidate Login</a></li>
@@ -84,7 +112,7 @@
     {% block content %}{% endblock %}
   </main>
 
-  <!-- Footer -->
+  <!-- High-Contrast Accessible Footer -->
   {% block footer %}
   <footer class="hs-footer" id="contact">
     <div class="container">
@@ -94,37 +122,39 @@
             <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
             <span class="text-white fw-bold fs-5">HireScan</span>
           </div>
-          <p class="text-muted pe-lg-4 mb-3">
+          <p class="hs-footer-desc pe-lg-4 mb-3">
             A comprehensive, secure Test Management Tool designed for modern recruitment workflows, automated assessment delivery, and reliable candidate evaluation.
           </p>
-          <div class="small text-secondary">
-            Project Release: Phase 1 Core Setup
+          <div class="hs-footer-tag small d-inline-flex align-items-center gap-2">
+            <i class="bi bi-shield-check text-primary"></i>
+            <span>Enterprise Assessment &amp; Analytics Platform</span>
           </div>
         </div>
 
         <div class="col-lg-3 col-md-6">
-          <h6 class="text-white fw-bold mb-3">Assessment Portals</h6>
+          <h6 class="hs-footer-heading mb-3">Assessment Portals</h6>
           <ul class="list-unstyled d-flex flex-column gap-2 mb-0">
-            <li><a href="{% url 'admin_login' %}"><i class="bi bi-chevron-right text-primary me-1 small"></i> Administrator Login</a></li>
-            <li><a href="{% url 'candidate_login' %}"><i class="bi bi-chevron-right text-success me-1 small"></i> Candidate Login</a></li>
-            <li><a href="{% url 'homepage' %}#how-it-works"><i class="bi bi-chevron-right text-muted me-1 small"></i> Assessment Workflow</a></li>
+            <li><a class="hs-footer-link" href="{% url 'admin_login' %}"><i class="bi bi-chevron-right text-primary me-1 small"></i> Administrator Login</a></li>
+            <li><a class="hs-footer-link" href="{% url 'candidate_login' %}"><i class="bi bi-chevron-right text-success me-1 small"></i> Candidate Login</a></li>
+            <li><a class="hs-footer-link" href="{% url 'homepage' %}#how-it-works"><i class="bi bi-chevron-right text-info me-1 small"></i> Assessment Workflow</a></li>
           </ul>
         </div>
 
         <div class="col-lg-4 col-md-12">
-          <h6 class="text-white fw-bold mb-3">Support & Security</h6>
-          <p class="small text-muted mb-2">
+          <h6 class="hs-footer-heading mb-3">Support &amp; Security</h6>
+          <p class="hs-footer-desc small mb-3">
             Candidates receive assessment invites and one-time access verification codes exclusively through administrator import registrations.
           </p>
-          <div class="badge bg-dark border border-secondary text-light p-2">
-            <i class="bi bi-lock-fill text-warning me-1"></i> End-to-End Evaluation Security
+          <div class="hs-footer-badge">
+            <i class="bi bi-lock-fill text-warning me-1"></i>
+            <span>End-to-End Evaluation Security</span>
           </div>
         </div>
       </div>
 
       <hr class="hs-footer-divider">
 
-      <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 small text-muted">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 small hs-footer-muted">
         <div>
           &copy; {% now "Y" %} HireScan Test Management Tool. All rights reserved.
         </div>

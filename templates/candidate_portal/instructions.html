@@ -4,24 +4,7 @@
 {% block title %}Instructions: {{ test.test_name }} — HireScan{% endblock %}
 
 {% block navbar %}
-<!-- Candidate Top Navbar -->
-<header>
-  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
-    <div class="container">
-      <a class="hs-brand" href="{% url 'candidate_dashboard' %}">
-        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
-        HireScan <span class="badge bg-success-subtle text-success border border-success-subtle fs-6 ms-1">Candidate</span>
-      </a>
-
-      <div class="ms-auto d-flex align-items-center gap-3">
-        <span class="small text-muted d-none d-md-inline">Examinee: <strong>{{ candidate.name }}</strong> ({{ candidate.email }})</span>
-        <a href="{% url 'candidate_logout' %}" class="btn btn-outline-danger btn-sm">
-          <i class="bi bi-box-arrow-right"></i> Logout
-        </a>
-      </div>
-    </div>
-  </nav>
-</header>
+{% include 'candidate_portal/includes/navbar.html' %}
 {% endblock %}
 
 {% block content %}

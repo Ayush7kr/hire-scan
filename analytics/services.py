@@ -74,10 +74,14 @@ def calculate_candidate_rankings_and_percentiles(test_id):
     for index, attempt in enumerate(finalized_attempts, start=1):
         cand_score = attempt.score if attempt.score is not None else 0
 
-        # Count strictly lower and equal scores
-        B = sum(1 for s in all_scores if s < cand_score)
-        E = sum(1 for s in all_scores if s == cand_score)
-        percentile = round(((B + 0.5 * E) / N) * 100, 1)
+        # Psychometric percentile requires a comparative cohort (N >= 2).
+        # For a single finalized candidate (N=1), a percentile cannot be meaningfully calculated.
+        if N > 1:
+            B = sum(1 for s in all_scores if s < cand_score)
+            E = sum(1 for s in all_scores if s == cand_score)
+            percentile = round(((B + 0.5 * E) / N) * 100, 1)
+        else:
+            percentile = '—'
 
         # Standard competition rank
         rank = sum(1 for s in all_scores if s > cand_score) + 1

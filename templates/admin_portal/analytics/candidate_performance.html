@@ -4,69 +4,13 @@
 {% block title %}Candidate Performance Reports — HireScan Admin{% endblock %}
 
 {% block navbar %}
-<header>
-  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
-    <div class="container-fluid px-lg-4">
-      <a class="hs-brand" href="{% url 'admin_dashboard' %}">
-        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
-        HireScan <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-6 ms-1">Admin Analytics</span>
-      </a>
-      <div class="ms-auto d-flex align-items-center gap-3">
-        <span class="small text-muted d-none d-md-inline">Signed in as <strong>{{ request.admin_user.name }}</strong></span>
-        <a href="{% url 'admin_logout' %}" class="btn btn-outline-danger btn-sm">
-          <i class="bi bi-box-arrow-right"></i> Logout
-        </a>
-      </div>
-    </div>
-  </nav>
-</header>
+{% include 'admin_portal/includes/navbar.html' with admin_navbar_badge='Admin Analytics' %}
 {% endblock %}
 
 {% block content %}
 <div class="d-flex admin-layout-wrapper">
   <!-- Sidebar -->
-  <aside class="admin-sidebar">
-    <div class="sidebar-heading">Management</div>
-    <nav class="d-flex flex-column">
-      <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
-        <i class="bi bi-speedometer2"></i> Dashboard
-      </a>
-      <a href="{% url 'candidate_list' %}" class="sidebar-nav-item">
-        <i class="bi bi-people"></i> Candidates
-      </a>
-      <a href="{% url 'candidate_import' %}" class="sidebar-nav-item">
-        <i class="bi bi-file-earmark-arrow-up"></i> Candidate Imports
-      </a>
-      <a href="{% url 'test_list' %}" class="sidebar-nav-item">
-        <i class="bi bi-journal-text"></i> Tests
-      </a>
-      <a href="{% url 'registration_list' %}" class="sidebar-nav-item">
-        <i class="bi bi-card-checklist"></i> Test Registrations
-      </a>
-
-      <div class="sidebar-heading mt-3">Analytics & Reports</div>
-      <a href="{% url 'analytics_test_summary' %}" class="sidebar-nav-item">
-        <i class="bi bi-bar-chart-steps"></i> Test Summaries
-      </a>
-      <a href="{% url 'analytics_candidate_performance' %}" class="sidebar-nav-item active">
-        <i class="bi bi-person-lines-fill"></i> Candidate Performance
-      </a>
-      <a href="{% url 'analytics_question_analysis' %}" class="sidebar-nav-item">
-        <i class="bi bi-patch-question"></i> Question Analysis
-      </a>
-      <a href="{% url 'analytics_topic_performance' %}" class="sidebar-nav-item">
-        <i class="bi bi-diagram-3"></i> Topic Competency
-      </a>
-      <a href="{% url 'analytics_completion_report' %}" class="sidebar-nav-item">
-        <i class="bi bi-clock-history"></i> Completion Pipeline
-      </a>
-
-      <div class="sidebar-heading mt-3">System</div>
-      <a href="{% url 'admin_logout' %}" class="sidebar-nav-item text-danger">
-        <i class="bi bi-box-arrow-right"></i> Logout
-      </a>
-    </nav>
-  </aside>
+  {% include 'admin_portal/includes/sidebar.html' with active_nav='candidate_performance' %}
 
   <!-- Main Content -->
   <main class="admin-content">
@@ -87,7 +31,7 @@
         </div>
 
         <div class="d-flex gap-2">
-          <a href="{% url 'analytics_export_candidates' %}?{% if test_id %}test_id={{ test_id }}&{% endif %}{% if search_query %}q={{ search_query }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if outcome_filter %}outcome={{ outcome_filter }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}{% endif %}" class="btn btn-outline-success btn-sm fw-bold">
+          <a href="{% url 'analytics_export_candidates' %}{% if filter_querystring %}?{{ filter_querystring }}{% endif %}" class="btn btn-outline-success btn-sm fw-bold">
             <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export Filtered CSV
           </a>
         </div>
@@ -157,7 +101,7 @@
                 <th>Outcome</th>
                 <th>Rank & Percentile</th>
                 <th>Time Taken</th>
-                <th class="pe-3 text-end">Scorecard</th>
+                <th class="pe-3 text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -205,7 +149,7 @@
                   </td>
                   <td class="small font-mono">
                     {% if att.rank and att.rank != '—' %}
-                      Rank #{{ att.rank }} &bull; {{ att.percentile }}%
+                      Rank #{{ att.rank }}{% if att.percentile and att.percentile != '—' %} &bull; {{ att.percentile }}%{% else %} &bull; <span class="text-muted" title="Cohort percentile unavailable for single candidate or pending cohort">N/A</span>{% endif %}
                     {% else %}
                       <span class="text-muted">—</span>
                     {% endif %}
@@ -213,13 +157,13 @@
                   <td class="small font-mono text-muted">
                     {{ att.time_taken_seconds|default:"0" }}s
                   </td>
-                  <td class="pe-3 text-end">
-                    <a href="{% url 'admin_attempt_detail' attempt_id=att.attempt_id %}" class="btn btn-outline-primary btn-sm" title="Detailed Audit Trail">
-                      <i class="bi bi-eye"></i>
+                  <td class="pe-3 text-end text-nowrap">
+                    <a href="{% url 'admin_attempt_detail' attempt_id=att.attempt_id %}?from=candidate_performance{% if filter_querystring %}&{{ filter_querystring }}{% endif %}{% if page_obj.number > 1 %}&page={{ page_obj.number }}{% endif %}" class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-1" title="View Detailed Assessment Attempt">
+                      <i class="bi bi-eye"></i> View Attempt
                     </a>
                     {% if att.status in 'completed,expired' %}
-                      <a href="{% url 'attempt_scorecard_pdf' attempt_id=att.attempt_id %}" class="btn btn-outline-danger btn-sm" title="Download Official PDF">
-                        <i class="bi bi-file-earmark-pdf-fill"></i>
+                      <a href="{% url 'attempt_scorecard_pdf' attempt_id=att.attempt_id %}" class="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-1 ms-1" title="Download Scorecard PDF">
+                        <i class="bi bi-file-earmark-pdf"></i> PDF
                       </a>
                     {% endif %}
                   </td>
@@ -227,6 +171,7 @@
               {% empty %}
                 <tr>
                   <td colspan="9" class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary"></i>
                     No candidate assessment attempts match the selected criteria.
                   </td>
                 </tr>
@@ -235,29 +180,49 @@
           </table>
         </div>
 
-        <!-- Pagination -->
-        {% if page_obj.has_other_pages %}
-          <div class="card-footer bg-white border-top py-2 px-3 d-flex justify-content-between align-items-center">
-            <div class="small text-muted">
-              Showing page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ total_count }} total attempts)
-            </div>
+        <!-- Pagination & Summary Footer -->
+        <div class="card-footer bg-white border-top py-2 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div class="small text-muted">
+            {% if total_count > 0 %}
+              Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of <strong>{{ total_count }}</strong> matching record{{ total_count|pluralize }}
+            {% else %}
+              0 matching records
+            {% endif %}
+          </div>
+          {% if page_obj.has_other_pages %}
             <ul class="pagination pagination-sm mb-0">
               {% if page_obj.has_previous %}
                 <li class="page-item">
-                  <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if test_id %}&test_id={{ test_id }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if outcome_filter %}&outcome={{ outcome_filter }}{% endif %}">Previous</a>
+                  <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filter_querystring %}&{{ filter_querystring }}{% endif %}">
+                    <i class="bi bi-chevron-left"></i> Previous
+                  </a>
                 </li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-left"></i> Previous</span></li>
               {% endif %}
-              <li class="page-item active">
-                <span class="page-link">{{ page_obj.number }}</span>
-              </li>
+
+              {% for p in page_obj.paginator.page_range %}
+                {% if p == page_obj.number %}
+                  <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+                {% elif p > page_obj.number|add:"-3" and p < page_obj.number|add:"3" %}
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ p }}{% if filter_querystring %}&{{ filter_querystring }}{% endif %}">{{ p }}</a>
+                  </li>
+                {% endif %}
+              {% endfor %}
+
               {% if page_obj.has_next %}
                 <li class="page-item">
-                  <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if test_id %}&test_id={{ test_id }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if outcome_filter %}&outcome={{ outcome_filter }}{% endif %}">Next</a>
+                  <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filter_querystring %}&{{ filter_querystring }}{% endif %}">
+                    Next <i class="bi bi-chevron-right"></i>
+                  </a>
                 </li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">Next <i class="bi bi-chevron-right"></i></span></li>
               {% endif %}
             </ul>
-          </div>
-        {% endif %}
+          {% endif %}
+        </div>
       </div>
 
     </div>

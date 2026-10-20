@@ -455,3 +455,95 @@ class DatabaseIntegrityAndConstraintsTests(TestCase):
 
         with self.assertRaises(Exception):
             TestAttempt.objects.create(registration=reg)
+
+
+class ProductionHardeningAndSecurityTests(TestCase):
+    """Test suite verifying security hardening, open redirect mitigation, rate-limiting, and error templates."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = Admin(
+            name="Security Admin",
+            email="secadmin@hirescan.local"
+        )
+        self.admin.set_password("SecurePass123!")
+        self.admin.save()
+
+        self.candidate = Candidate.objects.create(
+            name="Security Candidate",
+            email="sec.candidate@test.local",
+            is_active=True
+        )
+
+    def test_admin_login_safe_internal_redirect(self):
+        """Valid internal relative URL in next parameter is followed after authentication."""
+        response = self.client.post(reverse('admin_login'), {
+            'email': 'secadmin@hirescan.local',
+            'password': 'SecurePass123!',
+            'next': '/admin/candidates/'
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, '/admin/candidates/')
+
+    def test_admin_login_blocks_malicious_open_redirect(self):
+        """Malicious external URL in next parameter is rejected, falling back to admin dashboard."""
+        response = self.client.post(reverse('admin_login'), {
+            'email': 'secadmin@hirescan.local',
+            'password': 'SecurePass123!',
+            'next': 'https://evil.phishing-site.com/steal-creds'
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('admin_dashboard'))
+
+    def test_otp_request_rate_limiting_enforcement(self):
+        """Exceeding configured OTP requests per minute from an IP triggers HTTP 429."""
+        from django.test import override_settings
+        from django.core.cache import cache
+        cache.clear()
+
+        with override_settings(ENFORCE_OTP_RATE_LIMIT_IN_TESTS=True, OTP_IP_RATE_LIMIT_PER_MINUTE=2):
+            # First request - OK
+            resp1 = self.client.post(reverse('candidate_send_otp'), {'email': 'sec.candidate@test.local'})
+            self.assertEqual(resp1.status_code, 200)
+
+            # Second request (simulate different candidate so cooldown doesn't fire first)
+            cand2 = Candidate.objects.create(name="Cand Two", email="cand2@test.local")
+            resp2 = self.client.post(reverse('candidate_send_otp'), {'email': 'cand2@test.local'})
+            self.assertEqual(resp2.status_code, 200)
+
+            # Third request exceeds limit (2/min) -> 429 Too Many Requests
+            cand3 = Candidate.objects.create(name="Cand Three", email="cand3@test.local")
+            resp3 = self.client.post(reverse('candidate_send_otp'), {'email': 'cand3@test.local'})
+            self.assertEqual(resp3.status_code, 429)
+            self.assertIn('Too many verification code requests', resp3.json()['error'])
+
+        cache.clear()
+
+    def test_custom_404_view_renders_correctly(self):
+        """Non-existent URL renders custom 404 page with HireScan branding."""
+        response = self.client.get('/definitely-nonexistent-route-404-check/')
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, 'Page Not Found', status_code=404)
+        self.assertContains(response, 'Return to Homepage', status_code=404)
+
+    def test_custom_error_handlers(self):
+        """Custom 400, 403, and 500 views render expected error status codes and copy."""
+        from config.views import error_400, error_403, error_500
+        from django.test import RequestFactory
+        factory = RequestFactory()
+
+        req400 = factory.get('/')
+        res400 = error_400(req400)
+        self.assertEqual(res400.status_code, 400)
+        self.assertIn(b'Invalid Request', res400.content)
+
+        req403 = factory.get('/')
+        res403 = error_403(req403)
+        self.assertEqual(res403.status_code, 403)
+        self.assertIn(b'Access Restricted', res403.content)
+
+        req500 = factory.get('/')
+        res500 = error_500(req500)
+        self.assertEqual(res500.status_code, 500)
+        self.assertIn(b'Internal Server Error', res500.content)
+

@@ -3,7 +3,9 @@ Authorization decorators for role-based access control.
 These enforce server-side authentication checks on every protected view.
 """
 from functools import wraps
+from urllib.parse import quote
 from django.shortcuts import redirect
+from django.urls import reverse
 from django.http import HttpResponseForbidden
 
 
@@ -13,6 +15,9 @@ def admin_required(view_func):
     def wrapper(request, *args, **kwargs):
         admin_id = request.session.get('admin_id')
         if not admin_id:
+            path = request.get_full_path()
+            if path and path != '/':
+                return redirect(f"{reverse('admin_login')}?next={quote(path)}")
             return redirect('admin_login')
         # Verify admin still exists in database
         from accounts.models import Admin

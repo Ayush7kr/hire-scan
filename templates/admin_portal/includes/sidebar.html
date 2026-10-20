@@ -1,0 +1,42 @@
+<aside class="admin-sidebar">
+  <div class="sidebar-heading">Management</div>
+  <nav class="d-flex flex-column">
+    <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item {% if active_nav == 'dashboard' or not active_nav and request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">
+      <i class="bi bi-speedometer2"></i> Dashboard
+    </a>
+    <a href="{% url 'candidate_list' %}" class="sidebar-nav-item {% if active_nav == 'candidates' or not active_nav and request.resolver_match.url_name in 'candidate_list,candidate_detail,candidate_edit' %}active{% endif %}">
+      <i class="bi bi-people"></i> Candidates
+    </a>
+    <a href="{% url 'candidate_import' %}" class="sidebar-nav-item {% if active_nav == 'candidate_import' or not active_nav and request.resolver_match.url_name == 'candidate_import' %}active{% endif %}">
+      <i class="bi bi-file-earmark-arrow-up"></i> Candidate Imports
+    </a>
+    <a href="{% url 'test_list' %}" class="sidebar-nav-item {% if active_nav == 'tests' or not active_nav and request.resolver_match.url_name in 'test_list,test_create,test_detail,test_edit,question_list,question_create,question_edit,question_import,admin_test_attempts' or not active_nav and request.resolver_match.url_name == 'admin_attempt_detail' and request.GET.from != 'candidate_performance' %}active{% endif %}">
+      <i class="bi bi-journal-text"></i> Tests
+    </a>
+    <a href="{% url 'registration_list' %}" class="sidebar-nav-item {% if active_nav == 'registrations' or not active_nav and request.resolver_match.url_name in 'registration_list,registration_create,registration_detail' %}active{% endif %}">
+      <i class="bi bi-card-checklist"></i> Test Registrations
+    </a>
+
+    <div class="sidebar-heading mt-3">Analytics & Reports</div>
+    <a href="{% url 'analytics_test_summary' %}" class="sidebar-nav-item {% if active_nav == 'test_summary' or not active_nav and request.resolver_match.url_name in 'analytics_test_summary,analytics_test_detail' %}active{% endif %}">
+      <i class="bi bi-bar-chart-steps"></i> Test Summaries
+    </a>
+    <a href="{% url 'analytics_candidate_performance' %}" class="sidebar-nav-item {% if active_nav == 'candidate_performance' or not active_nav and request.resolver_match.url_name == 'analytics_candidate_performance' or not active_nav and request.resolver_match.url_name == 'admin_attempt_detail' and request.GET.from == 'candidate_performance' %}active{% endif %}">
+      <i class="bi bi-person-lines-fill"></i> Candidate Performance
+    </a>
+    <a href="{% url 'analytics_question_analysis' %}" class="sidebar-nav-item {% if active_nav == 'question_analysis' or not active_nav and request.resolver_match.url_name == 'analytics_question_analysis' %}active{% endif %}">
+      <i class="bi bi-patch-question"></i> Question Analysis
+    </a>
+    <a href="{% url 'analytics_topic_performance' %}" class="sidebar-nav-item {% if active_nav == 'topic_performance' or not active_nav and request.resolver_match.url_name == 'analytics_topic_performance' %}active{% endif %}">
+      <i class="bi bi-diagram-3"></i> Topic Competency
+    </a>
+    <a href="{% url 'analytics_completion_report' %}" class="sidebar-nav-item {% if active_nav == 'completion_report' or not active_nav and request.resolver_match.url_name == 'analytics_completion_report' %}active{% endif %}">
+      <i class="bi bi-clock-history"></i> Completion Pipeline
+    </a>
+
+    <div class="sidebar-heading mt-3">System</div>
+    <a href="{% url 'admin_logout' %}" class="sidebar-nav-item text-danger">
+      <i class="bi bi-box-arrow-right"></i> Logout
+    </a>
+  </nav>
+</aside>

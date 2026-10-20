@@ -16,6 +16,7 @@ import io
 import re
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
@@ -64,7 +65,7 @@ def admin_dashboard(request):
     # Recent activity log
     recent_activity = ActivityLog.objects.select_related(
         'admin', 'candidate', 'attempt'
-    ).order_by('-occurred_at')[:10]
+    ).order_by('-occurred_at')[:30]
 
     # Test pipeline summary table
     test_summaries = get_test_summary_analytics()[:6]
@@ -214,6 +215,12 @@ def candidate_performance_report(request):
         att.rank = r_info.get('rank', '—')
         att.percentile = r_info.get('percentile', '—')
 
+    # Clean querystring for export and pagination links (excludes page param)
+    params = request.GET.copy()
+    if 'page' in params:
+        del params['page']
+    filter_querystring = params.urlencode()
+
     context = {
         'page_obj': page_obj,
         'all_tests': all_tests,
@@ -224,6 +231,7 @@ def candidate_performance_report(request):
         'date_from': request.GET.get('date_from', '').strip(),
         'date_to': request.GET.get('date_to', '').strip(),
         'total_count': attempts_qs.count(),
+        'filter_querystring': filter_querystring,
     }
     return render(request, 'admin_portal/analytics/candidate_performance.html', context)
 

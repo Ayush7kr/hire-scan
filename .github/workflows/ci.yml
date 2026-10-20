@@ -1,0 +1,76 @@
+name: HireScan Continuous Integration
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: Lint, Deployment Check & Test Suite
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: hirescan_test_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_secure_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify Static File Collection
+        run: |
+          python manage.py collectstatic --noinput
+
+      - name: Run Django Deployment Verification Check
+        env:
+          SECRET_KEY: "ci-testing-long-secret-key-that-has-over-fifty-characters-random-123456789"
+          DEBUG: "False"
+          ALLOWED_HOSTS: "localhost,127.0.0.1,testserver"
+          SECURE_SSL_REDIRECT: "False"
+          SESSION_COOKIE_SECURE: "True"
+          CSRF_COOKIE_SECURE: "True"
+        run: |
+          python manage.py check --deploy
+
+      - name: Run Database Migrations on PostgreSQL
+        env:
+          DATABASE_URL: "postgres://postgres:postgres_secure_ci_password@localhost:5432/hirescan_test_db"
+          RUN_MIGRATIONS: "true"
+        run: |
+          python manage.py migrate --noinput
+
+      - name: Run Automated Regression Test Suite
+        env:
+          DATABASE_URL: "postgres://postgres:postgres_secure_ci_password@localhost:5432/hirescan_test_db"
+          EMAIL_BACKEND: "django.core.mail.backends.locmem.EmailBackend"
+        run: |
+          python manage.py test --verbosity=2

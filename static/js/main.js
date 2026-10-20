@@ -18,6 +18,56 @@ function getCookie(name) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+  // ──────────────── Theme Mode (Light / Dark) Toggle ────────────────
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-bs-theme', theme);
+    try {
+      localStorage.setItem('hirescan_theme', theme);
+    } catch (e) {}
+
+    // Update icons
+    document.querySelectorAll('.hs-theme-toggle').forEach(btn => {
+      const moonIcons = btn.querySelectorAll('.theme-icon-moon');
+      const sunIcons = btn.querySelectorAll('.theme-icon-sun');
+      const label = btn.querySelector('.theme-toggle-label');
+
+      if (theme === 'dark') {
+        moonIcons.forEach(icon => icon.classList.add('d-none'));
+        sunIcons.forEach(icon => icon.classList.remove('d-none'));
+        if (label) label.textContent = 'Light Mode';
+        btn.setAttribute('aria-label', 'Switch to light mode');
+      } else {
+        sunIcons.forEach(icon => icon.classList.add('d-none'));
+        moonIcons.forEach(icon => icon.classList.remove('d-none'));
+        if (label) label.textContent = 'Dark Mode';
+        btn.setAttribute('aria-label', 'Switch to dark mode');
+      }
+    });
+
+    // Notify listeners (e.g. Chart.js)
+    window.dispatchEvent(new CustomEvent('hirescan:themechange', { detail: { theme: theme } }));
+  }
+
+  // Determine current active theme (default to 'light' unless stored)
+  let initialTheme = 'light';
+  try {
+    initialTheme = localStorage.getItem('hirescan_theme') || document.documentElement.getAttribute('data-theme') || 'light';
+  } catch (e) {
+    initialTheme = document.documentElement.getAttribute('data-theme') || 'light';
+  }
+  applyTheme(initialTheme);
+
+  // Attach listener to all theme toggle triggers
+  document.querySelectorAll('.hs-theme-toggle').forEach(btn => {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      const activeTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      const nextTheme = activeTheme === 'dark' ? 'light' : 'dark';
+      applyTheme(nextTheme);
+    });
+  });
+
   // ──────────────── Password Visibility Toggle ────────────────
   document.querySelectorAll('.password-toggle-btn').forEach(button => {
     button.addEventListener('click', function () {

@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}403 — Access Forbidden — HireScan{% endblock %}
+
+{% block content %}
+<div class="container py-5 my-md-5 text-center">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <div class="card p-4 p-md-5 shadow-sm border">
+        <div class="mb-4">
+          <span class="badge bg-danger-subtle text-danger border border-danger-subtle fs-6 px-3 py-2 rounded-pill">
+            <i class="bi bi-shield-slash me-1"></i> HTTP 403 Forbidden
+          </span>
+        </div>
+        <h1 class="display-6 fw-bold mb-3">Access Restricted</h1>
+        <p class="text-muted mb-4">
+          You do not have permission to access the requested resource or test attempt. Please ensure you are authenticated with an authorized account.
+        </p>
+        <div class="d-flex flex-wrap gap-2 justify-content-center">
+          <a href="{% url 'candidate_login' %}" class="btn btn-hs-primary">
+            <i class="bi bi-person me-1"></i> Candidate Login
+          </a>
+          <a href="{% url 'admin_login' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-shield-lock me-1"></i> Administrator Login
+          </a>
+          <a href="{% url 'homepage' %}" class="btn btn-link text-muted">
+            Homepage
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

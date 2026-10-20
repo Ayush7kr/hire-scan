@@ -1,77 +1,192 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}HireScan — Smarter Technical Assessments. Better Hiring Decisions.{% endblock %}
+{% block title %}HireScan — Secure Technical Assessments &amp; Evaluation Platform{% endblock %}
 
 {% block content %}
-<!-- Hero Section -->
-<section class="hs-hero text-center" id="home">
+<!-- ==========================================================================
+     Hero Section (Two-Column Desktop Layout with Interactive Product Preview)
+     ========================================================================== -->
+<section class="hs-hero-section" id="home">
   <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-10">
+    <div class="row align-items-center g-5">
+      <!-- Left Column: Copy & Actions -->
+      <div class="col-lg-6">
         <div class="hs-hero-badge">
-          <i class="bi bi-patch-check-fill text-primary"></i> Production-Ready Assessment Platform
+          <i class="bi bi-shield-check"></i>
+          <span>Secure Assessment Management</span>
         </div>
         <h1 class="hs-hero-title">
           Smarter Technical Assessments.<br>Better Hiring Decisions.
         </h1>
-        <p class="hs-hero-subtitle mx-auto">
-          HireScan helps organizations manage candidate registrations, conduct secure technical assessments, and evaluate performance through detailed analytics.
+        <p class="hs-hero-subtitle">
+          Assess skills, manage candidate evaluations, and make confident data-driven hiring decisions with HireScan's automated examination platform.
         </p>
 
-        <!-- Primary Actions -->
-        <div class="d-flex flex-wrap justify-content-center gap-3 mt-4">
-          <a href="{% url 'admin_login' %}" class="btn btn-hs-primary btn-lg px-4 d-inline-flex align-items-center gap-2">
-            <i class="bi bi-shield-lock-fill"></i> Administrator Login
+        <!-- Primary Action CTAs -->
+        <div class="d-flex flex-wrap gap-3 mb-2">
+          <a href="{% url 'admin_login' %}" class="btn btn-hs-primary px-4 py-2 d-inline-flex align-items-center gap-2">
+            <i class="bi bi-shield-lock-fill"></i>
+            <span>Administrator Login</span>
           </a>
-          <a href="{% url 'candidate_login' %}" class="btn btn-hs-candidate btn-lg px-4 d-inline-flex align-items-center gap-2">
-            <i class="bi bi-person-check-fill text-info"></i> Candidate Login
+          <a href="{% url 'candidate_login' %}" class="btn btn-hs-candidate px-4 py-2 d-inline-flex align-items-center gap-2">
+            <i class="bi bi-person-badge-fill text-info"></i>
+            <span>Candidate Login</span>
           </a>
         </div>
 
-        <div class="mt-4 pt-2 text-muted small d-flex flex-wrap justify-content-center gap-4">
-          <span><i class="bi bi-check-circle-fill text-success me-1"></i> Timed Assessments</span>
-          <span><i class="bi bi-check-circle-fill text-success me-1"></i> OTP Email Verification</span>
-          <span><i class="bi bi-check-circle-fill text-success me-1"></i> Server-side Evaluation</span>
+        <!-- Capability Chips -->
+        <div class="hs-hero-chips">
+          <div class="hs-hero-chip">
+            <i class="bi bi-check-circle-fill text-success"></i>
+            <span>Timed Assessments</span>
+          </div>
+          <div class="hs-hero-chip">
+            <i class="bi bi-check-circle-fill text-success"></i>
+            <span>Email OTP Verification</span>
+          </div>
+          <div class="hs-hero-chip">
+            <i class="bi bi-check-circle-fill text-success"></i>
+            <span>Server-side Evaluation</span>
+          </div>
+          <div class="hs-hero-chip">
+            <i class="bi bi-check-circle-fill text-success"></i>
+            <span>Instant Analytics</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Illustrative Product Preview Mockup -->
+      <div class="col-lg-6">
+        <div class="hs-preview-frame">
+          <!-- Window Header Bar -->
+          <div class="hs-preview-header">
+            <div class="hs-window-dots">
+              <span class="hs-window-dot red"></span>
+              <span class="hs-window-dot yellow"></span>
+              <span class="hs-window-dot green"></span>
+            </div>
+            <div class="d-flex align-items-center gap-2 small text-muted font-mono">
+              <span class="hs-pulse-dot"></span>
+              <span>HireScan Live Engine • Active</span>
+            </div>
+            <div class="badge bg-primary-subtle text-primary border border-primary-subtle small px-2 py-0">
+              v1.0
+            </div>
+          </div>
+
+          <!-- Preview Content Body -->
+          <div class="hs-preview-body">
+            <!-- Simulated Metric Row -->
+            <div class="row g-2 mb-3">
+              <div class="col-4">
+                <div class="hs-preview-stat-card">
+                  <div class="small text-muted mb-1">Completion</div>
+                  <div class="hs-preview-stat-val text-primary">94.8%</div>
+                  <div class="small text-success mt-1" style="font-size: 0.72rem;">
+                    <i class="bi bi-arrow-up-short"></i> +4.2% cohort
+                  </div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="hs-preview-stat-card">
+                  <div class="small text-muted mb-1">Avg Score</div>
+                  <div class="hs-preview-stat-val text-success">78.4%</div>
+                  <div class="small text-muted mt-1" style="font-size: 0.72rem;">
+                    <i class="bi bi-graph-up text-success"></i> Target 70%
+                  </div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="hs-preview-stat-card">
+                  <div class="small text-muted mb-1">Active Tests</div>
+                  <div class="hs-preview-stat-val text-info">12 Live</div>
+                  <div class="small text-muted mt-1" style="font-size: 0.72rem;">
+                    <i class="bi bi-broadcast text-info"></i> Streaming
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Simulated Live Assessment Progress Widget -->
+            <div class="border rounded-3 p-3 bg-white mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                  <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0 me-1">In Progress</span>
+                  <strong class="small text-dark">Python Technical Assessment</strong>
+                </div>
+                <span class="badge bg-light text-muted border font-mono small">
+                  <i class="bi bi-stopwatch text-danger me-1"></i> 18:42 left
+                </span>
+              </div>
+
+              <div class="d-flex justify-content-between align-items-center small text-muted mb-1">
+                <span>Examinee: Alex Morgan</span>
+                <span class="fw-semibold text-dark">15 of 20 answered</span>
+              </div>
+              <div class="progress" style="height: 6px;">
+                <div class="progress-bar bg-primary" role="progressbar" style="width: 75%;" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+            </div>
+
+            <!-- Simulated Security & Topic Breakdown Pill Strip -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 small text-muted pt-1">
+              <span class="d-inline-flex align-items-center gap-1">
+                <i class="bi bi-shuffle text-primary"></i>
+                <span>Randomized Question Sets</span>
+              </span>
+              <span class="d-inline-flex align-items-center gap-1">
+                <i class="bi bi-cloud-check text-success"></i>
+                <span>Autosave Synced</span>
+              </span>
+              <span class="d-inline-flex align-items-center gap-1">
+                <i class="bi bi-file-earmark-pdf text-danger"></i>
+                <span>Verified Scorecards</span>
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- About Section -->
+<!-- ==========================================================================
+     About Section
+     ========================================================================== -->
 <section class="py-5 bg-white" id="about">
   <div class="container py-4">
     <div class="row align-items-center g-5">
       <div class="col-lg-6">
-        <span class="text-primary fw-bold text-uppercase small letter-spacing">About HireScan</span>
+        <span class="text-primary fw-semibold small text-uppercase" style="letter-spacing: 0.05em;">About HireScan</span>
         <h2 class="mt-2 mb-3 fw-bold">Empowering Hiring Teams with Transparent Assessments</h2>
-        <p class="text-muted leading-relaxed">
-          HireScan is an end-to-end examination and test management solution tailored for educational institutions, recruitment drives, and corporate hiring processes.
+        <p class="text-muted">
+          HireScan is an end-to-end examination and test management solution tailored for recruitment drives, academic evaluations, and technical screening.
         </p>
-        <p class="text-muted leading-relaxed">
-          By eliminating manual evaluation overhead and preventing arbitrary access, HireScan ensures fairness and cryptographic rigor at every touchpoint—from candidate onboarding to instantaneous result computation.
+        <p class="text-muted">
+          By eliminating manual evaluation overhead and preventing unauthorized access, HireScan ensures fairness and cryptographic rigor at every touchpoint—from candidate onboarding to instantaneous result computation.
         </p>
         <div class="row g-3 mt-2">
           <div class="col-sm-6">
-            <div class="p-3 border rounded bg-light">
-              <h5 class="fw-bold mb-1 text-primary">Zero Signup Hassle</h5>
-              <p class="small text-muted mb-0">Direct import ensures only authorized candidates access assessments.</p>
+            <div class="p-3 border rounded-3 bg-light h-100">
+              <h5 class="fw-semibold mb-1 text-primary">Zero Signup Friction</h5>
+              <p class="small text-muted mb-0">Direct administrator roster imports ensure only pre-authorized candidates access assessments.</p>
             </div>
           </div>
           <div class="col-sm-6">
-            <div class="p-3 border rounded bg-light">
-              <h5 class="fw-bold mb-1 text-primary">Tamper-Proof</h5>
-              <p class="small text-muted mb-0">Answers and timers are strictly validated on the backend.</p>
+            <div class="p-3 border rounded-3 bg-light h-100">
+              <h5 class="fw-semibold mb-1 text-primary">Tamper-Resistant</h5>
+              <p class="small text-muted mb-0">Authoritative server clocks, answer hashes, and single-attempt locks safeguard exam integrity.</p>
             </div>
           </div>
         </div>
       </div>
+
       <div class="col-lg-6">
         <div class="p-4 border rounded-3 bg-light shadow-sm">
           <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
-            <span class="fw-bold text-secondary"><i class="bi bi-cpu me-2"></i>Assessment Integrity Engine</span>
-            <span class="badge bg-success-subtle text-success border border-success-subtle">Online</span>
+            <span class="fw-semibold text-secondary"><i class="bi bi-cpu me-2"></i>Assessment Security Architecture</span>
+            <span class="badge bg-success-subtle text-success border border-success-subtle">Operational</span>
           </div>
           <div class="list-group list-group-flush bg-transparent">
             <div class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
@@ -79,16 +194,20 @@
               <span class="badge bg-primary">Enforced</span>
             </div>
             <div class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
-              <span><i class="bi bi-envelope-check text-primary me-2"></i> One-Time Password Verification</span>
+              <span><i class="bi bi-envelope-check text-primary me-2"></i> Passwordless One-Time Password Verification</span>
               <span class="badge bg-primary">Active</span>
             </div>
             <div class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
-              <span><i class="bi bi-stopwatch text-primary me-2"></i> Server Timestamp Enforcement</span>
+              <span><i class="bi bi-stopwatch text-primary me-2"></i> Server-Enforced Countdown Clocks</span>
               <span class="badge bg-primary">Active</span>
             </div>
             <div class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
-              <span><i class="bi bi-shuffle text-primary me-2"></i> Question Set Randomization</span>
+              <span><i class="bi bi-shuffle text-primary me-2"></i> Dynamic Question Randomization</span>
               <span class="badge bg-primary">Dynamic</span>
+            </div>
+            <div class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
+              <span><i class="bi bi-file-earmark-pdf text-primary me-2"></i> Instant Scorecards &amp; Exportable PDFs</span>
+              <span class="badge bg-success">Ready</span>
             </div>
           </div>
         </div>
@@ -97,21 +216,23 @@
   </div>
 </section>
 
-<!-- How It Works Section -->
+<!-- ==========================================================================
+     How It Works (3-Step Polished Sequence)
+     ========================================================================== -->
 <section class="py-5" id="how-it-works">
   <div class="container py-4">
-    <div class="text-center max-w-xl mx-auto mb-5">
-      <span class="text-primary fw-bold text-uppercase small letter-spacing">Streamlined Workflow</span>
-      <h2 class="mt-2 fw-bold">How It Works</h2>
-      <p class="text-muted">A clear, automated 3-step evaluation journey designed for administrators and examinees.</p>
+    <div class="text-center mx-auto mb-5" style="max-width: 620px;">
+      <span class="text-primary fw-semibold small text-uppercase" style="letter-spacing: 0.05em;">Streamlined Workflow</span>
+      <h2 class="mt-2 fw-bold">How HireScan Works</h2>
+      <p class="text-muted">A clear, automated 3-step evaluation journey designed for hiring managers and examinees.</p>
     </div>
 
     <div class="row g-4 justify-content-center">
       <!-- Step 1 -->
       <div class="col-lg-4 col-md-6">
         <div class="hs-card text-center">
-          <div class="hs-step-num mx-auto">1</div>
-          <h4 class="fw-bold mb-3">Configure & Register</h4>
+          <div class="hs-step-num mx-auto">01</div>
+          <h4 class="fw-semibold mb-3">Configure &amp; Register</h4>
           <p class="text-muted mb-0">
             Administrators configure tests with time limits, upload question banks, and import candidates via structured CSV rosters.
           </p>
@@ -121,8 +242,8 @@
       <!-- Step 2 -->
       <div class="col-lg-4 col-md-6">
         <div class="hs-card text-center">
-          <div class="hs-step-num mx-auto">2</div>
-          <h4 class="fw-bold mb-3">Secure Assessment</h4>
+          <div class="hs-step-num mx-auto">02</div>
+          <h4 class="fw-semibold mb-3">Secure Assessment</h4>
           <p class="text-muted mb-0">
             Candidates log in using time-limited email OTPs and complete secure, randomized, timed technical assessments with autosave.
           </p>
@@ -132,8 +253,8 @@
       <!-- Step 3 -->
       <div class="col-lg-4 col-md-6">
         <div class="hs-card text-center">
-          <div class="hs-step-num mx-auto">3</div>
-          <h4 class="fw-bold mb-3">Review & Analyze</h4>
+          <div class="hs-step-num mx-auto">03</div>
+          <h4 class="fw-semibold mb-3">Review &amp; Analyze</h4>
           <p class="text-muted mb-0">
             Review instant server-side evaluated scores, topic-wise accuracy breakdowns, pass/fail status, and export comprehensive reports.
           </p>
@@ -143,12 +264,14 @@
   </div>
 </section>
 
-<!-- Features Section -->
+<!-- ==========================================================================
+     Key Capabilities (Features Grid)
+     ========================================================================== -->
 <section class="py-5 bg-white" id="features">
   <div class="container py-4">
-    <div class="text-center max-w-xl mx-auto mb-5">
-      <span class="text-primary fw-bold text-uppercase small letter-spacing">Key Capabilities</span>
-      <h2 class="mt-2 fw-bold">Engineered for Reliability & Scale</h2>
+    <div class="text-center mx-auto mb-5" style="max-width: 620px;">
+      <span class="text-primary fw-semibold small text-uppercase" style="letter-spacing: 0.05em;">Key Capabilities</span>
+      <h2 class="mt-2 fw-bold">Engineered for Reliability &amp; Scale</h2>
       <p class="text-muted">Explore the core features that power the HireScan assessment ecosystem.</p>
     </div>
 
@@ -159,9 +282,9 @@
           <div class="hs-card-icon blue">
             <i class="bi bi-shield-lock"></i>
           </div>
-          <h5 class="fw-bold mb-2">Secure Candidate Authentication</h5>
+          <h5 class="fw-semibold mb-2">Secure OTP Authentication</h5>
           <p class="text-muted small mb-0">
-            Cryptographically secure email OTPs prevent unauthorized test attempts, password fatigue, and account sharing.
+            Cryptographically secure email OTPs prevent unauthorized test attempts, password fatigue, and account sharing with a 5-minute expiry.
           </p>
         </div>
       </div>
@@ -172,9 +295,9 @@
           <div class="hs-card-icon purple">
             <i class="bi bi-shuffle"></i>
           </div>
-          <h5 class="fw-bold mb-2">Randomized Technical Assessments</h5>
+          <h5 class="fw-semibold mb-2">Randomized Question Sets</h5>
           <p class="text-muted small mb-0">
-            Unique randomized subsets from comprehensive question banks ensure every candidate receives an equitable assessment.
+            Unique randomized subsets from comprehensive question pools ensure every candidate receives an equitable assessment.
           </p>
         </div>
       </div>
@@ -185,9 +308,9 @@
           <div class="hs-card-icon emerald">
             <i class="bi bi-alarm"></i>
           </div>
-          <h5 class="fw-bold mb-2">Timed Tests & Automatic Evaluation</h5>
+          <h5 class="fw-semibold mb-2">Timed Tests &amp; Evaluation</h5>
           <p class="text-muted small mb-0">
-            Backend timestamps enforce strict test durations. Instant server-side evaluation calculates scores upon submission.
+            Authoritative server timestamps strictly enforce test durations and finalize tests upon expiration with automatic grading.
           </p>
         </div>
       </div>
@@ -198,7 +321,7 @@
           <div class="hs-card-icon amber">
             <i class="bi bi-person-vcard"></i>
           </div>
-          <h5 class="fw-bold mb-2">Candidate-Specific Test Access</h5>
+          <h5 class="fw-semibold mb-2">Candidate-Specific Access</h5>
           <p class="text-muted small mb-0">
             Candidates only see tests for which they have been registered, strictly governed by unique database constraints.
           </p>
@@ -211,7 +334,7 @@
           <div class="hs-card-icon sky">
             <i class="bi bi-graph-up-arrow"></i>
           </div>
-          <h5 class="fw-bold mb-2">Performance Analytics</h5>
+          <h5 class="fw-semibold mb-2">Performance Analytics</h5>
           <p class="text-muted small mb-0">
             Track metrics including average scores, pass/fail ratios, question difficulty indexes, and topic-wise proficiency.
           </p>
@@ -222,11 +345,11 @@
       <div class="col-lg-4 col-md-6">
         <div class="hs-card">
           <div class="hs-card-icon rose">
-            <i class="bi bi-file-earmark-spreadsheet"></i>
+            <i class="bi bi-file-earmark-pdf"></i>
           </div>
-          <h5 class="fw-bold mb-2">CSV & PDF Reporting</h5>
+          <h5 class="fw-semibold mb-2">PDF Scorecards &amp; CSV Exports</h5>
           <p class="text-muted small mb-0">
-            Export assessment rosters and candidate performance logs to CSV with upcoming PDF scorecard generations.
+            Generate official PDF scorecards for candidates and export assessment summaries, pipelines, and results to CSV spreadsheets.
           </p>
         </div>
       </div>
@@ -234,18 +357,22 @@
   </div>
 </section>
 
-<!-- Call to Action Section -->
-<section class="py-5 bg-light text-center border-top">
+<!-- ==========================================================================
+     Call to Action Section
+     ========================================================================== -->
+<section class="py-5 hs-cta-section text-center">
   <div class="container py-4">
-    <div class="max-w-xl mx-auto">
-      <h3 class="fw-bold mb-3">Ready to begin assessments?</h3>
-      <p class="text-muted mb-4">Select your portal to log in and manage or take your scheduled technical evaluation.</p>
+    <div class="mx-auto" style="max-width: 600px;">
+      <h3 class="fw-bold mb-3">Ready to Begin Assessments?</h3>
+      <p class="text-muted mb-4">
+        Select your portal to log in, manage recruitment evaluations, or take your scheduled technical assessment.
+      </p>
       <div class="d-flex flex-wrap justify-content-center gap-3">
-        <a href="{% url 'admin_login' %}" class="btn btn-hs-primary">
-          <i class="bi bi-shield-lock me-1"></i> Access Administrator Portal
+        <a href="{% url 'admin_login' %}" class="btn btn-hs-primary px-4 py-2">
+          <i class="bi bi-shield-lock me-2"></i> Access Administrator Portal
         </a>
-        <a href="{% url 'candidate_login' %}" class="btn btn-hs-outline">
-          <i class="bi bi-person-badge me-1"></i> Candidate Assessment Portal
+        <a href="{% url 'candidate_login' %}" class="btn btn-hs-outline px-4 py-2">
+          <i class="bi bi-person-badge me-2"></i> Candidate Assessment Portal
         </a>
       </div>
     </div>

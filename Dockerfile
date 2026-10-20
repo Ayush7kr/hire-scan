@@ -37,8 +37,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application source code
 COPY --chown=hirescan:hirescan . /app/
 
-# Ensure startup script is executable
-RUN chmod +x /app/entrypoint.sh
+# Ensure startup script is executable and normalized to Unix line endings
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Switch to non-root user
 USER hirescan

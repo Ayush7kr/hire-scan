@@ -4,70 +4,13 @@
 {% block title %}Test Registrations — HireScan Admin{% endblock %}
 
 {% block navbar %}
-<header>
-  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
-    <div class="container-fluid px-lg-4">
-      <a class="hs-brand" href="{% url 'admin_dashboard' %}">
-        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
-        HireScan <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-6 ms-1">Admin</span>
-      </a>
-      <div class="ms-auto d-flex align-items-center gap-3">
-        <span class="small text-muted d-none d-md-inline">Signed in as <strong>{{ request.admin_user.name }}</strong></span>
-        <a href="{% url 'admin_logout' %}" class="btn btn-outline-danger btn-sm">
-          <i class="bi bi-box-arrow-right"></i> Logout
-        </a>
-      </div>
-    </div>
-  </nav>
-</header>
+{% include 'admin_portal/includes/navbar.html' %}
 {% endblock %}
 
 {% block content %}
 <div class="d-flex admin-layout-wrapper">
   <!-- Sidebar -->
-  <aside class="admin-sidebar">
-    <div class="sidebar-heading">Navigation</div>
-    <nav class="d-flex flex-column">
-      <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item">
-        <i class="bi bi-speedometer2"></i> Dashboard
-      </a>
-      <a href="{% url 'candidate_list' %}" class="sidebar-nav-item">
-        <i class="bi bi-people"></i> Candidates
-      </a>
-      <a href="{% url 'candidate_import' %}" class="sidebar-nav-item">
-        <i class="bi bi-file-earmark-arrow-up"></i> Candidate Imports
-      </a>
-      <a href="{% url 'test_list' %}" class="sidebar-nav-item">
-        <i class="bi bi-journal-text"></i> Tests
-      </a>
-      <a href="{% url 'registration_list' %}" class="sidebar-nav-item active">
-        <i class="bi bi-card-checklist"></i> Test Registrations
-      </a>
-
-      <div class="sidebar-heading mt-3">Analytics & Reports</div>
-      <a href="{% url 'analytics_test_summary' %}" class="sidebar-nav-item">
-        <i class="bi bi-bar-chart-steps"></i> Test Summaries
-      </a>
-      <a href="{% url 'analytics_candidate_performance' %}" class="sidebar-nav-item">
-        <i class="bi bi-person-lines-fill"></i> Candidate Performance
-      </a>
-      <a href="{% url 'analytics_question_analysis' %}" class="sidebar-nav-item">
-        <i class="bi bi-patch-question"></i> Question Analysis
-      </a>
-      <a href="{% url 'analytics_topic_performance' %}" class="sidebar-nav-item">
-        <i class="bi bi-diagram-3"></i> Topic Competency
-      </a>
-      <a href="{% url 'analytics_completion_report' %}" class="sidebar-nav-item">
-        <i class="bi bi-clock-history"></i> Completion Pipeline
-      </a>
-
-      <div class="sidebar-heading mt-3">System</div>
-      <a href="{% url 'admin_logout' %}" class="sidebar-nav-item text-danger">
-        <i class="bi bi-box-arrow-right"></i> Logout
-      </a>
-
-    </nav>
-  </aside>
+  {% include 'admin_portal/includes/sidebar.html' with active_nav='registrations' %}
 
   <!-- Main Content -->
   <main class="admin-content">

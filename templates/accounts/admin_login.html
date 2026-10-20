@@ -25,6 +25,9 @@
     <!-- Custom HTML Form (No Django Forms or ModelForms used) -->
     <form method="POST" action="{% url 'admin_login' %}" novalidate id="adminLoginForm">
       {% csrf_token %}
+      {% if next %}
+        <input type="hidden" name="next" value="{{ next }}">
+      {% endif %}
 
       <!-- Email Field -->
       <div class="mb-3">

@@ -9,13 +9,23 @@ from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.utils import timezone
 from django.core.mail import send_mail
+from django.core.cache import cache
 from django.conf import settings
 from django.views.decorators.http import require_http_methods
+from django.utils.http import url_has_allowed_host_and_scheme
 from datetime import timedelta
 
 from accounts.models import Admin, Candidate, OTPVerification, ActivityLog
 
 logger = logging.getLogger(__name__)
+
+
+def get_client_ip(request):
+    """Safely resolve client IP address handling proxies and direct connections."""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', '127.0.0.1')
 
 
 # ──────────────────────────── Public Homepage ────────────────────────────
@@ -29,8 +39,12 @@ def homepage(request):
 
 @require_http_methods(["GET", "POST"])
 def admin_login(request):
-    """Admin login with email + password."""
+    """Admin login with email + password and safe redirect protection."""
+    next_url = request.POST.get('next') or request.GET.get('next', '')
+
     if request.session.get('admin_id'):
+        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+            return redirect(next_url)
         return redirect('admin_dashboard')
 
     errors = {}
@@ -61,6 +75,9 @@ def admin_login(request):
                         activity_type='admin_login',
                         activity_details=f'Admin {admin.name} logged in successfully.'
                     )
+                    # Validate and execute safe redirect
+                    if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+                        return redirect(next_url)
                     return redirect('admin_dashboard')
                 else:
                     errors['general'] = 'Invalid email or password.'
@@ -74,7 +91,7 @@ def admin_login(request):
             activity_details=f'Failed login attempt for email: {email}'
         )
 
-    return render(request, 'accounts/admin_login.html', {'errors': errors})
+    return render(request, 'accounts/admin_login.html', {'errors': errors, 'next': next_url})
 
 
 # ──────────────────────────── Candidate Login ────────────────────────────
@@ -89,7 +106,22 @@ def candidate_login(request):
 
 @require_http_methods(["POST"])
 def candidate_send_otp(request):
-    """Send OTP to candidate's registered email."""
+    """Send OTP to candidate's registered email with rate-limiting protection."""
+    client_ip = get_client_ip(request)
+    rate_limit = getattr(settings, 'OTP_IP_RATE_LIMIT_PER_MINUTE', 5)
+    enforce_rate_limit = not getattr(settings, 'IS_TESTING', False) or getattr(settings, 'ENFORCE_OTP_RATE_LIMIT_IN_TESTS', False)
+
+    if enforce_rate_limit:
+        cache_key = f"otp_rate_limit_{client_ip}"
+        request_count = cache.get(cache_key, 0)
+        if request_count >= rate_limit:
+            logger.warning("OTP send rate limit exceeded for client IP: %s", client_ip)
+            return JsonResponse({
+                'success': False,
+                'error': 'Too many verification code requests. Please wait a minute before requesting another code.'
+            }, status=429)
+        cache.set(cache_key, request_count + 1, timeout=60)
+
     email = request.POST.get('email', '').strip().lower()
 
     if not email:

@@ -33,7 +33,15 @@ def test_list(request):
     search_query = request.GET.get('q', '').strip()
     status_filter = request.GET.get('status', '').strip()
 
-    tests_qs = Test.objects.all().order_by('-created_at')
+    tests_qs = Test.objects.annotate(
+        bank_count=Count('questions', distinct=True),
+        reg_count=Count('registrations', distinct=True),
+        completed_count=Count(
+            'registrations__attempt',
+            filter=Q(registrations__attempt__status='completed'),
+            distinct=True
+        )
+    ).order_by('-created_at')
 
     if search_query:
         tests_qs = tests_qs.filter(test_name__icontains=search_query)
@@ -47,13 +55,8 @@ def test_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    # Attach computed metrics per test
+    # Attach sufficiency status
     for test in page_obj:
-        test.bank_count = Question.objects.filter(test=test).count()
-        test.reg_count = TestRegistration.objects.filter(test=test).count()
-        test.completed_count = TestAttempt.objects.filter(
-            registration__test=test, status='completed'
-        ).count()
         test.is_sufficient = test.bank_count >= test.total_questions
 
     context = {
@@ -1049,6 +1052,12 @@ def admin_attempt_detail(request, attempt_id):
     secs = seconds % 60
     time_taken_formatted = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
 
+    # Preserve calling filter parameters for back-navigation
+    return_params = request.GET.copy()
+    if 'from' in return_params:
+        del return_params['from']
+    return_querystring = return_params.urlencode()
+
     context = {
         'attempt': attempt,
         'test': attempt.registration.test,
@@ -1056,6 +1065,8 @@ def admin_attempt_detail(request, attempt_id):
         'topic_performance': topic_performance,
         'attempt_questions': attempt_questions,
         'time_taken_formatted': time_taken_formatted,
+        'nav_from': request.GET.get('from', '').strip(),
+        'return_querystring': return_querystring,
     }
     return render(request, 'admin_portal/tests/attempt_detail.html', context)
 

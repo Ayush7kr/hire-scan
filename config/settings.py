@@ -24,8 +24,8 @@ SECRET_KEY = os.getenv('SECRET_KEY', DEV_DEFAULT_SECRET_KEY)
 # DEBUG evaluation: defaults to True only if explicitly not 'False'/'0'/'no'
 DEBUG = os.getenv('DEBUG', 'True').strip().lower() in ('true', '1', 'yes')
 
-# Check if we are running in a test execution context
-IS_TESTING = 'test' in sys.argv or 'testserver' in os.getenv('ALLOWED_HOSTS', '')
+# Check if we are running in a test execution context (CLI test runner or pytest)
+IS_TESTING = any(arg in sys.argv for arg in ('test', 'pytest')) or any(arg.endswith('test') or arg.endswith('test.py') for arg in sys.argv)
 
 # Fail safely if in production with insecure or missing SECRET_KEY
 if not DEBUG and not IS_TESTING:
@@ -171,13 +171,16 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 9. Session Security
+# 9. Session & Cookie Security
 # ─────────────────────────────────────────────────────────────────────────────
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = int(os.getenv('SESSION_COOKIE_AGE', 86400))  # 24 hours
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_SAVE_EVERY_REQUEST = True
+
+CSRF_COOKIE_HTTPONLY = False  # Set to False so AJAX clients (autosave) can read token via JS
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 10. Production Security Hardening & Reverse Proxy Headers
@@ -239,6 +242,7 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', default_from_addr)
 OTP_EXPIRY_MINUTES = int(os.getenv('OTP_EXPIRY_MINUTES', 5))
 OTP_MAX_ATTEMPTS = int(os.getenv('OTP_MAX_ATTEMPTS', 3))
 OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv('OTP_RESEND_COOLDOWN_SECONDS', 60))
+OTP_IP_RATE_LIMIT_PER_MINUTE = int(os.getenv('OTP_IP_RATE_LIMIT_PER_MINUTE', 5))
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 12. Structured Application Logging

@@ -14,6 +14,7 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.db import transaction, IntegrityError
+from django.db.models import Count
 from django.views.decorators.http import require_http_methods
 
 from accounts.decorators import admin_required
@@ -25,9 +26,12 @@ from assessments.models import Test, TestRegistration
 def candidate_list(request):
     """
     Display a paginated, searchable list of candidates.
+    Uses database annotation for registration count to prevent N+1 queries.
     """
     search_query = request.GET.get('q', '').strip()
-    candidates_qs = Candidate.objects.all().order_by('-created_at')
+    candidates_qs = Candidate.objects.annotate(
+        reg_count=Count('registrations')
+    ).order_by('-created_at')
 
     if search_query:
         candidates_qs = candidates_qs.filter(
@@ -36,14 +40,9 @@ def candidate_list(request):
             email__icontains=search_query
         )
 
-    # Annotate or count registrations
     paginator = Paginator(candidates_qs, 15)  # 15 candidates per page
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-
-    # Attach registration count per candidate in current page
-    for cand in page_obj:
-        cand.reg_count = TestRegistration.objects.filter(candidate=cand).count()
 
     context = {
         'page_obj': page_obj,

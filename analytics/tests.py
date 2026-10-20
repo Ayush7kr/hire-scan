@@ -285,6 +285,57 @@ class CandidateRankingAndPercentileTests(AnalyticsBaseTestCase):
         self.assertEqual(bob_r['percentile'], 50.0)
         self.assertEqual(eve_r['percentile'], 50.0)
 
+    def test_single_candidate_percentile_returns_unavailable(self):
+        """
+        When only one candidate has finalized an assessment (N=1), psychometric percentile
+        cannot be meaningfully calculated relative to a cohort.
+        Rank must be 1, and percentile must be '—' (unavailable state).
+        """
+        # Create a new test with only 1 candidate and attempt
+        single_test = Test.objects.create(
+            test_name="Single Examinee Test",
+            duration_minutes=30,
+            total_questions=1,
+            passing_marks=1,
+            is_active=True
+        )
+        q = Question.objects.create(
+            test=single_test,
+            question_text="Sample Q",
+            option1="A",
+            option2="B",
+            option3="C",
+            option4="D",
+            correct_option=1,
+            topic="General"
+        )
+        cand = Candidate.objects.create(name="Lone Candidate", email="lone@test.local")
+        reg = TestRegistration.objects.create(candidate=cand, test=single_test, status='registered')
+        att = start_attempt_for_registration(reg)
+        aq = att.attempt_questions.first()
+        aq.selected_option = 1
+        aq.save()
+        evaluate_attempt(att, submission_reason='manual')
+
+        rankings = calculate_candidate_rankings_and_percentiles(single_test.test_id)
+        self.assertEqual(len(rankings), 1)
+        lone_rank = rankings[str(att.attempt_id)]
+        self.assertEqual(lone_rank['rank'], 1)
+        self.assertEqual(lone_rank['percentile'], '—')
+
+    def test_zero_finalized_candidates_ranking(self):
+        """When an assessment has no finalized attempts, rankings dictionary is empty."""
+        empty_test = Test.objects.create(
+            test_name="Empty Test",
+            duration_minutes=30,
+            total_questions=1,
+            passing_marks=1,
+            is_active=True
+        )
+        rankings = calculate_candidate_rankings_and_percentiles(empty_test.test_id)
+        self.assertEqual(rankings, {})
+
+
 
 class QuestionAndTopicAnalysisTests(AnalyticsBaseTestCase):
     """Tests for question accuracy denominators and topic aggregation."""
@@ -457,3 +508,115 @@ class ReportViewsAuthorizationTests(AnalyticsBaseTestCase):
         for url in routes:
             res = self.admin_client.get(url)
             self.assertEqual(res.status_code, 200, f"Failed for URL: {url}")
+
+
+class AdminUINavigationAndFilteringTests(AnalyticsBaseTestCase):
+    """
+    Tests for Admin UI consistency, sidebar completeness, candidate performance filtering,
+    server-side pagination, contextual attempt navigation, and dashboard audit stream.
+    """
+
+    def test_candidate_import_sidebar_contains_all_11_links_and_active_state(self):
+        """Candidate Imports page must render the full shared sidebar including Analytics & Reports."""
+        res = self.admin_client.get(reverse('candidate_import'))
+        self.assertEqual(res.status_code, 200)
+        content = res.content.decode('utf-8')
+
+        # Check all 11 core admin links exist in sidebar
+        expected_links = [
+            reverse('admin_dashboard'),
+            reverse('candidate_list'),
+            reverse('candidate_import'),
+            reverse('test_list'),
+            reverse('registration_list'),
+            reverse('analytics_test_summary'),
+            reverse('analytics_candidate_performance'),
+            reverse('analytics_question_analysis'),
+            reverse('analytics_topic_performance'),
+            reverse('analytics_completion_report'),
+            reverse('admin_logout'),
+        ]
+        for link in expected_links:
+            self.assertIn(link, content, f"Expected sidebar link {link} missing on candidate_import")
+
+        # Verify active class on candidate_import
+        self.assertIn('Candidate Imports', content)
+        self.assertIn('Analytics & Reports', content)
+
+    def test_candidate_performance_search_and_filters(self):
+        """Candidate Performance report filters by name/email, test, status, and outcome."""
+        url = reverse('analytics_candidate_performance')
+
+        # Search by partial candidate name
+        res_name = self.admin_client.get(url, {'q': 'Alice'})
+        self.assertEqual(res_name.status_code, 200)
+        self.assertIn('Alice Walker', res_name.content.decode('utf-8'))
+        self.assertNotIn('Bob Smith', res_name.content.decode('utf-8'))
+
+        # Search by partial email
+        res_email = self.admin_client.get(url, {'q': 'bob@test'})
+        self.assertEqual(res_email.status_code, 200)
+        self.assertIn('Bob Smith', res_email.content.decode('utf-8'))
+        self.assertNotIn('Alice Walker', res_email.content.decode('utf-8'))
+
+        # Filter by test_id
+        res_test = self.admin_client.get(url, {'test_id': str(self.test1.test_id)})
+        self.assertEqual(res_test.status_code, 200)
+        self.assertEqual(res_test.context['total_count'], 3)
+
+        # Filter by outcome passed
+        res_passed = self.admin_client.get(url, {'outcome': 'passed'})
+        self.assertEqual(res_passed.status_code, 200)
+        # Alice passed (5/5 >= 60%), Bob passed (3/5 = 60%), Charlie failed (1/5 = 20%)
+        self.assertIn('Alice Walker', res_passed.content.decode('utf-8'))
+        self.assertNotIn('Charlie Davis', res_passed.content.decode('utf-8'))
+
+        # Filter by outcome failed
+        res_failed = self.admin_client.get(url, {'outcome': 'failed'})
+        self.assertEqual(res_failed.status_code, 200)
+        self.assertIn('Charlie Davis', res_failed.content.decode('utf-8'))
+        self.assertNotIn('Alice Walker', res_failed.content.decode('utf-8'))
+
+        # Combined filters: Alice, passed, completed
+        res_comb = self.admin_client.get(url, {'q': 'Alice', 'outcome': 'passed', 'status': 'completed'})
+        self.assertEqual(res_comb.status_code, 200)
+        self.assertIn('Alice Walker', res_comb.content.decode('utf-8'))
+        self.assertEqual(res_comb.context['total_count'], 1)
+
+    def test_candidate_performance_query_string_preservation(self):
+        """Candidate performance view computes filter_querystring cleanly without page."""
+        url = reverse('analytics_candidate_performance')
+        res = self.admin_client.get(url, {'q': 'Alice', 'outcome': 'passed', 'page': '1'})
+        self.assertEqual(res.status_code, 200)
+        f_qs = res.context['filter_querystring']
+        self.assertIn('q=Alice', f_qs)
+        self.assertIn('outcome=passed', f_qs)
+        self.assertNotIn('page=', f_qs)
+
+    def test_attempt_detail_contextual_navigation_from_candidate_performance(self):
+        """Clicking View Attempt from Candidate Performance passes navigation context and back link."""
+        url = reverse('admin_attempt_detail', args=[self.att1.attempt_id]) + '?from=candidate_performance&q=Alice'
+        res = self.admin_client.get(url)
+        self.assertEqual(res.status_code, 200)
+        content = res.content.decode('utf-8')
+
+        # Contextual breadcrumb and Back button
+        self.assertIn('Candidate Performance', content)
+        self.assertIn('Back to Candidate Performance', content)
+        self.assertIn('q=Alice', content)
+
+    def test_standard_attempt_inspection_from_tests_workflow_preserved(self):
+        """Navigating to attempt detail from Tests workflow displays Tests breadcrumbs and Back to Attempts."""
+        url = reverse('admin_attempt_detail', args=[self.att1.attempt_id])
+        res = self.admin_client.get(url)
+        self.assertEqual(res.status_code, 200)
+        content = res.content.decode('utf-8')
+
+        self.assertIn('Back to Attempts List', content)
+
+    def test_dashboard_audit_stream_has_scrollable_container(self):
+        """Dashboard renders Audit Activity Stream inside scrollable container."""
+        res = self.admin_client.get(reverse('admin_dashboard'))
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('audit-activity-container', res.content.decode('utf-8'))
+

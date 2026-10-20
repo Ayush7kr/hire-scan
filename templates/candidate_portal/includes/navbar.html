@@ -1,0 +1,33 @@
+<header>
+  <nav class="navbar navbar-expand-lg hs-navbar sticky-top">
+    <div class="container">
+      <a class="hs-brand" href="{% url 'candidate_dashboard' %}">
+        <span class="hs-brand-icon"><i class="bi bi-shield-check"></i></span>
+        HireScan <span class="badge bg-success-subtle text-success border border-success-subtle fs-6 ms-1">Candidate</span>
+      </a>
+
+      <div class="d-flex align-items-center gap-2 d-lg-none">
+        {% include 'includes/theme_toggle.html' %}
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#candidateNavbarNav" aria-controls="candidateNavbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+      </div>
+
+      <div class="collapse navbar-collapse" id="candidateNavbarNav">
+        <ul class="navbar-nav ms-auto align-items-center gap-2 gap-lg-3 pt-2 pt-lg-0">
+          <li class="nav-item">
+            <span class="small text-muted">Examinee: <strong>{{ candidate.name }}</strong> ({{ candidate.email }})</span>
+          </li>
+          <li class="nav-item d-none d-lg-block">
+            {% include 'includes/theme_toggle.html' %}
+          </li>
+          <li class="nav-item">
+            <a href="{% url 'candidate_logout' %}" class="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-1">
+              <i class="bi bi-box-arrow-right"></i> Logout
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+</header>

@@ -13,21 +13,30 @@
         HireScan <span class="badge {% if is_admin_view %}bg-primary-subtle text-primary border border-primary-subtle{% else %}bg-success-subtle text-success border border-success-subtle{% endif %} fs-6 ms-1">{% if is_admin_view %}Admin Evaluation{% else %}Candidate Scorecard{% endif %}</span>
       </a>
 
-      <div class="ms-auto d-flex align-items-center gap-3">
+      <div class="ms-auto d-flex align-items-center gap-2 gap-md-3">
         {% if is_admin_view %}
           <a href="{% url 'admin_test_attempts' test_id=test.test_id %}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left me-1"></i> Back to Test Attempts
           </a>
-          <span class="small text-muted d-none d-md-inline">Examinee: <strong>{{ candidate.name }}</strong> ({{ candidate.email }})</span>
+          <span class="small text-muted d-none d-md-inline">Examinee: <strong>{{ candidate.name }}</strong></span>
+          <a href="{% url 'attempt_scorecard_pdf' attempt_id=attempt.attempt_id %}" class="btn btn-outline-danger btn-sm fw-bold">
+            <i class="bi bi-file-earmark-pdf-fill me-1"></i> PDF Scorecard
+          </a>
+        {% else %}
+          <span class="small text-muted d-none d-md-inline">Examinee: <strong>{{ candidate.name }}</strong></span>
           <a href="{% url 'attempt_scorecard_pdf' attempt_id=attempt.attempt_id %}" class="btn btn-outline-danger btn-sm fw-bold">
             <i class="bi bi-file-earmark-pdf-fill me-1"></i> PDF Scorecard
           </a>
           <a href="{% url 'candidate_dashboard' %}" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-speedometer2 me-1"></i> Dashboard
           </a>
+          {% include 'includes/theme_toggle.html' %}
           <a href="{% url 'candidate_logout' %}" class="btn btn-outline-danger btn-sm">
             <i class="bi bi-box-arrow-right"></i> Logout
           </a>
+        {% endif %}
+        {% if is_admin_view %}
+          {% include 'includes/theme_toggle.html' %}
         {% endif %}
       </div>
 
