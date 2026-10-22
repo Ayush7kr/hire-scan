@@ -126,6 +126,38 @@
                   </div>
                 </div>
 
+                <!-- Schedule Window (Optional) -->
+                <div class="row g-3 mb-4">
+                  <div class="col-md-6">
+                    <label for="startTime" class="form-label">Schedule Start Window (Optional)</label>
+                    <input 
+                      type="datetime-local" 
+                      class="form-control {% if errors.start_time %}is-invalid{% endif %}" 
+                      id="startTime" 
+                      name="start_time" 
+                      value="{{ request.POST.start_time|default:'' }}"
+                    >
+                    <div class="form-text small text-muted">Leave blank for test to be available immediately upon activation.</div>
+                    {% if errors.start_time %}
+                      <div class="invalid-feedback d-block">{{ errors.start_time }}</div>
+                    {% endif %}
+                  </div>
+                  <div class="col-md-6">
+                    <label for="endTime" class="form-label">Schedule End Window (Optional)</label>
+                    <input 
+                      type="datetime-local" 
+                      class="form-control {% if errors.end_time %}is-invalid{% endif %}" 
+                      id="endTime" 
+                      name="end_time" 
+                      value="{{ request.POST.end_time|default:'' }}"
+                    >
+                    <div class="form-text small text-muted">Leave blank for open-ended assessment availability.</div>
+                    {% if errors.end_time %}
+                      <div class="invalid-feedback d-block">{{ errors.end_time }}</div>
+                    {% endif %}
+                  </div>
+                </div>
+
                 <div class="alert alert-light border py-2 px-3 small text-muted mb-4">
                   <i class="bi bi-info-circle me-1"></i>
                   <strong>Activation Policy:</strong> Newly configured tests are initialized in the <strong>Inactive</strong> state. You can activate the test once sufficient questions matching the attempt count are uploaded to its question bank.

@@ -92,7 +92,7 @@ All database tables utilize cryptographically secure, collision-resistant UUID4 
 | `candidate` | `accounts.Candidate` | `candidate_id` (UUID) | Examinee records created via admin CSV import with unique email and `is_active` flag. |
 | `otp_verification` | `accounts.OTPVerification` | `otp_id` (UUID) | 6-digit candidate OTP records with PBKDF2 hash, 5-min TTL, and 3-attempt limit. |
 | `activity_log` | `accounts.ActivityLog` | `activity_id` (UUID) | Immutable audit log of administrative actions, imports, and logins. |
-| `test` | `assessments.Test` | `test_id` (UUID) | Test configurations with duration, total questions, passing marks, and `is_active` flag. |
+| `test` | `assessments.Test` | `test_id` (UUID) | Test configurations with duration, total questions, passing marks, `start_time`, `end_time`, `is_cancelled`, and `is_active` flag. |
 | `question` | `assessments.Question` | `question_id` (UUID) | 4-option MCQs belonging to a test bank with topic, difficulty, suggestions, and correct option. |
 | `test_registration`| `assessments.TestRegistration` | `registration_id` (UUID) | Bridge table connecting candidate to test. Enforces `UNIQUE(candidate, test)`. |
 | `test_attempt` | `attempts.TestAttempt` | `attempt_id` (UUID) | Single attempt per registration via `OneToOneField`. Tracks score, time, status, and reason. |
@@ -151,6 +151,9 @@ erDiagram
         int total_questions
         int passing_marks
         boolean is_active
+        datetime start_time
+        datetime end_time
+        boolean is_cancelled
         datetime created_at
     }
 

@@ -43,11 +43,19 @@ def candidate_dashboard(request):
         except TestRegistration.attempt.RelatedObjectDoesNotExist:
             attempt = None
 
+        now = timezone.now()
+        is_window_open = (
+            (not reg.test.start_time or now >= reg.test.start_time) and
+            (not reg.test.end_time or now <= reg.test.end_time)
+        )
         can_start = (
             reg.status == 'registered'
             and reg.test.is_active
+            and not reg.test.is_cancelled
+            and is_window_open
             and attempt is None
             and reg.test.questions.count() >= reg.test.total_questions
+            and reg.test.status == 'in_progress'
         )
         can_resume = (
             attempt is not None

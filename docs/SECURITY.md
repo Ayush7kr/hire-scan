@@ -7,12 +7,13 @@ HireScan is engineered with defensive programming principles and enterprise-grad
 ## Table of Contents
 1. [Security Principles & Threat Model](#1-security-principles--threat-model)
 2. [Candidate OTP Authentication Security](#2-candidate-otp-authentication-security)
-3. [Administrator Authentication Security](#3-administrator-authentication-security)
-4. [Zero-Answer-Leak Architecture](#4-zero-answer-leak-architecture)
-5. [Anti-Enumeration & Privacy Controls](#5-anti-enumeration--privacy-controls)
-6. [Session & Cookie Security](#6-session--cookie-security)
-7. [HTTP Security Headers & Transport Layer](#7-http-security-headers--transport-layer)
-8. [Audit Logging & Forensic Traceability](#8-audit-logging--forensic-traceability)
+3. [Examination Access Gating & Schedule Integrity](#3-examination-access-gating--schedule-integrity)
+4. [Administrator Authentication Security](#4-administrator-authentication-security)
+5. [Zero-Answer-Leak Architecture](#5-zero-answer-leak-architecture)
+6. [Anti-Enumeration & Privacy Controls](#6-anti-enumeration--privacy-controls)
+7. [Session & Cookie Security](#7-session--cookie-security)
+8. [HTTP Security Headers & Transport Layer](#8-http-security-headers--transport-layer)
+9. [Audit Logging & Forensic Traceability](#9-audit-logging--forensic-traceability)
 
 ---
 
@@ -48,18 +49,30 @@ flowchart TD
     SaveDB --> SendEmail["Dispatch OTP Email via TLS"]
 ```
 
-### Cryptographic Protections
+### Cryptographic Protections & Email Security
 1. **Cryptographically Secure PRNG:** Codes are generated using Python's `secrets` module (`secrets.choice('0123456789')`).
-2. **PBKDF2 Hashing:** Plaintext OTPs are never stored in the database. Only PBKDF2-SHA256 hashes are persisted. Even in the event of a database compromise, attacker cannot read valid OTPs.
+2. **PBKDF2 Hashing:** Plaintext OTPs are never stored in the database. Only PBKDF2-SHA256 hashes are persisted. Even in the event of a database compromise, an attacker cannot read valid OTPs.
 3. **Constant-Time Comparison:** OTP verification uses Django's `check_password` which utilizes constant-time comparison algorithms to mitigate timing attacks.
 4. **Strict Rate Limiting & Expiry:**
    - **5-Minute Expiry:** OTP records automatically expire 300 seconds after creation.
    - **60-Second Cooldown:** Successive OTP requests within 60 seconds are rejected to prevent email bombardment.
    - **3-Attempt Invalidation:** After 3 incorrect submissions, the OTP record is permanently invalidated (`attempts_left = 0`).
+5. **Zero Log Exposure:** Verification codes are strictly excluded from all application logs, debug stack traces, and API responses.
+6. **Safe SMTP Exception Isolation:** Email delivery failures are caught cleanly, ensuring server exceptions cannot reveal candidate account existence or bypass authentication.
+7. **Responsive HTML & Plain-Text Fallback:** Dispatches branded, responsive emails with explicit security notices advising users never to disclose their verification code.
 
 ---
 
-## 3. Administrator Authentication Security
+## 3. Examination Access Gating & Schedule Integrity
+
+Access to examination instructions and question pools is protected by multi-layer server-side access controls:
+
+- **Schedule Window Enforcement:** Access is strictly bounded by `start_time` and `end_time`. Attempting to access an assessment before `start_time` (Upcoming) or after `end_time` (Expired) is blocked on the server, irrespective of client time settings.
+- **Immediate Cancellation Lock:** Tests marked `is_cancelled=True` immediately revoke candidate access to instructions and prevent attempt initialization.
+- **Sufficiency Gate:** An active test cannot be started unless the test question bank contains at least `total_questions`.
+- **Atomic Bulk Registrations:** Bulk candidate registrations are executed within atomic database transactions, preventing partial assignments and handling race conditions.
+
+## 4. Administrator Authentication Security
 
 System administrators manage assessments, questions, and sensitive evaluation reports. Administrative access is strictly protected:
 
@@ -69,7 +82,7 @@ System administrators manage assessments, questions, and sensitive evaluation re
 
 ---
 
-## 4. Zero-Answer-Leak Architecture
+## 5. Zero-Answer-Leak Architecture
 
 In many poorly designed examination systems, client-side applications load full question objects (including the correct answers) and check answers locally in JavaScript.
 
@@ -80,7 +93,7 @@ In many poorly designed examination systems, client-side applications load full 
 
 ---
 
-## 5. Anti-Enumeration & Privacy Controls
+## 6. Anti-Enumeration & Privacy Controls
 
 To prevent malicious actors from harvesting candidate lists or discovering which candidates are registered for an examination:
 
@@ -89,7 +102,7 @@ To prevent malicious actors from harvesting candidate lists or discovering which
 
 ---
 
-## 6. Session & Cookie Security
+## 7. Session & Cookie Security
 
 | Setting | Configuration Value | Security Purpose |
 | :--- | :--- | :--- |
@@ -104,7 +117,7 @@ Upon every successful sign-in, the session engine calls `request.session.cycle_k
 
 ---
 
-## 7. HTTP Security Headers & Transport Layer
+## 8. HTTP Security Headers & Transport Layer
 
 In production mode (`DJANGO_PRODUCTION=True`), HireScan enables comprehensive HTTP security headers:
 
@@ -121,7 +134,7 @@ In production mode (`DJANGO_PRODUCTION=True`), HireScan enables comprehensive HT
 
 ---
 
-## 8. Audit Logging & Forensic Traceability
+## 9. Audit Logging & Forensic Traceability
 
 Every sensitive administrative action is logged to the `ActivityLog` table (`accounts/models.py`), recording:
 

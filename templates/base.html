@@ -114,6 +114,14 @@
 
   <!-- High-Contrast Accessible Footer -->
   {% block footer %}
+  {% if request.session.admin_id or request.session.candidate_id %}
+  <footer class="hs-auth-footer">
+    <div class="container text-center">
+      <div class="hs-auth-footer-line1">&copy; 2026 HireScan Test Management Tool. All rights reserved.</div>
+      <div class="hs-auth-footer-line2">Secure Session Authentication &bull; Role-Based Access Control</div>
+    </div>
+  </footer>
+  {% else %}
   <footer class="hs-footer" id="contact">
     <div class="container">
       <div class="row g-4">
@@ -156,7 +164,7 @@
 
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 small hs-footer-muted">
         <div>
-          &copy; {% now "Y" %} HireScan Test Management Tool. All rights reserved.
+          &copy; 2026 HireScan Test Management Tool. All rights reserved.
         </div>
         <div class="d-flex gap-3">
           <span>Secure Session Authentication</span>
@@ -166,6 +174,7 @@
       </div>
     </div>
   </footer>
+  {% endif %}
   {% endblock %}
 
   <!-- Bootstrap 5 JS Bundle (Local Static) -->

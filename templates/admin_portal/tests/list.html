@@ -44,7 +44,7 @@
                   type="text" 
                   name="q" 
                   class="form-control" 
-                  placeholder="Search tests by title..." 
+                  placeholder="Search tests by title or description..." 
                   value="{{ search_query }}"
                 >
               </div>
@@ -52,6 +52,11 @@
             <div class="col-md-3">
               <select name="status" class="form-select">
                 <option value="">All Statuses</option>
+                <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>In Progress</option>
+                <option value="upcoming" {% if status_filter == 'upcoming' %}selected{% endif %}>Upcoming</option>
+                <option value="scheduled" {% if status_filter == 'scheduled' %}selected{% endif %}>Scheduled</option>
+                <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+                <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
                 <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Only</option>
                 <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive Only</option>
               </select>
@@ -112,11 +117,7 @@
                       {% endif %}
                     </td>
                     <td>
-                      {% if test.is_active %}
-                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">Active</span>
-                      {% else %}
-                        <span class="badge bg-secondary-subtle text-secondary border px-2 py-1">Inactive</span>
-                      {% endif %}
+                      <span class="badge {{ test.status_badge_class }} px-2 py-1">{{ test.status_display }}</span>
                     </td>
                     <td>
                       <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
@@ -145,7 +146,11 @@
                 <tr>
                   <td colspan="7" class="text-center py-5 text-muted">
                     <i class="bi bi-journal-x fs-2 d-block mb-2 text-secondary"></i>
-                    No tests found. Click <strong>Create New Test</strong> to set up an assessment.
+                    {% if search_query or status_filter %}
+                      No assessments match your search and filter criteria. <a href="{% url 'test_list' %}">Clear filters</a>
+                    {% else %}
+                      No tests found. Click <strong>Create New Test</strong> to set up an assessment.
+                    {% endif %}
                   </td>
                 </tr>
               {% endif %}
@@ -158,11 +163,11 @@
             <div class="small text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
             <ul class="pagination pagination-sm mb-0">
               {% if page_obj.has_previous %}
-                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">Previous</a></li>
               {% endif %}
               <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
               {% if page_obj.has_next %}
-                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">Next</a></li>
               {% endif %}
             </ul>
           </div>

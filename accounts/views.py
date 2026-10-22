@@ -9,6 +9,7 @@ from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.utils import timezone
 from django.core.mail import send_mail
+from django.template.loader import render_to_string
 from django.core.cache import cache
 from django.conf import settings
 from django.views.decorators.http import require_http_methods
@@ -171,16 +172,37 @@ def candidate_send_otp(request):
 
     # Send OTP via email
     try:
-        local_time_str = timezone.localtime(timezone.now()).strftime('%I:%M:%S %p')
+        now_local = timezone.localtime(timezone.now())
+        expires_local = timezone.localtime(otp_record.expires_at)
+        expires_time_str = expires_local.strftime('%I:%M %p')
+        local_time_str = now_local.strftime('%I:%M:%S %p')
+
+        email_context = {
+            'candidate_name': candidate.name,
+            'otp_code': otp_code,
+            'expiry_minutes': settings.OTP_EXPIRY_MINUTES,
+            'expires_time': expires_time_str,
+            'generated_time': local_time_str,
+        }
+        html_message = render_to_string('emails/otp_email.html', email_context)
+        plain_text_message = (
+            f"Hello {candidate.name},\n\n"
+            f"Your one-time login code is: {otp_code}\n\n"
+            f"Generated at: {local_time_str} (expires in {settings.OTP_EXPIRY_MINUTES} minutes, at {expires_time_str}).\n\n"
+            f"SECURITY ALERT: Do not share this code with anyone. HireScan staff will never ask for your verification code.\n\n"
+            f"Note: If you requested multiple codes, only this latest code is valid.\n\n"
+            f"If you did not request this code, please ignore this email.\n\n"
+            f"— HireScan Test Management Tool\n"
+            f"Secure Session Authentication • Role-Based Access Control"
+        )
+
         send_mail(
             subject='HireScan — Your Login OTP',
-            message=f'Your one-time login code is: {otp_code}\n\n'
-                    f'Generated at: {local_time_str} (expires in {settings.OTP_EXPIRY_MINUTES} minutes).\n\n'
-                    f'Note: If you requested multiple codes, only this latest code is valid.\n\n'
-                    f'If you did not request this code, please ignore this email.',
+            message=plain_text_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[candidate.email],
             fail_silently=False,
+            html_message=html_message,
         )
     except Exception as exc:
         logger.error("Failed to deliver OTP email to candidate %s: %s", candidate.email, exc)

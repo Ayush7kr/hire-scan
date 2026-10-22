@@ -519,3 +519,58 @@ class AuthorizationAndSecurityTests(AssessmentEngineBaseTestCase):
         )
         self.assertRedirects(res, reverse('test_results', args=[self.attempt.attempt_id]))
         self.assertEqual(TestAttempt.objects.filter(registration=self.registration).count(), 1)
+
+
+class TestStatusCandidateGatingTests(AssessmentEngineBaseTestCase):
+    """Test suite for candidate access gating under mentor-requested test statuses."""
+
+    def setUp(self):
+        super().setUp()
+        self.registration_bob = TestRegistration.objects.create(
+            candidate=self.candidate2,
+            test=self.test,
+            status='registered'
+        )
+
+    def test_candidate_cannot_start_cancelled_test(self):
+        """Candidate cannot start an assessment if the test has been cancelled."""
+        self.test.is_cancelled = True
+        self.test.save()
+
+        can_start, reason = validate_candidate_eligibility(
+            self.candidate2, self.registration_bob
+        )
+        self.assertFalse(can_start)
+        self.assertIn("cancelled", reason.lower())
+
+        # Attempting to access test instructions redirects with error
+        res = self.bob_client.get(
+            reverse('test_instructions', args=[self.registration_bob.registration_id])
+        )
+        self.assertEqual(res.status_code, 302)
+
+    def test_candidate_cannot_start_upcoming_test_before_start_time(self):
+        """Candidate cannot start an assessment before its configured start_time."""
+        now = timezone.now()
+        self.test.start_time = now + timedelta(hours=2)
+        self.test.save()
+
+        can_start, reason = validate_candidate_eligibility(
+            self.candidate2, self.registration_bob
+        )
+        self.assertFalse(can_start)
+        self.assertIn("upcoming", reason.lower())
+
+    def test_candidate_cannot_start_test_after_end_time(self):
+        """Candidate cannot start an assessment after its configured end_time window."""
+        now = timezone.now()
+        self.test.start_time = now - timedelta(hours=2)
+        self.test.end_time = now - timedelta(minutes=10)
+        self.test.save()
+
+        can_start, reason = validate_candidate_eligibility(
+            self.candidate2, self.registration_bob
+        )
+        self.assertFalse(can_start)
+        self.assertIn("ended", reason.lower())
+

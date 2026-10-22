@@ -29,11 +29,7 @@
         <div>
           <div class="d-flex align-items-center gap-2">
             <h2 class="fw-bold mb-0">{{ test.test_name }}</h2>
-            {% if test.is_active %}
-              <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
-            {% else %}
-              <span class="badge bg-secondary-subtle text-secondary border">Inactive</span>
-            {% endif %}
+            <span class="badge {{ test.status_badge_class }}">{{ test.status_display }}</span>
           </div>
           <div class="font-mono small text-muted mt-1">ID: {{ test.test_id }}</div>
         </div>
@@ -49,10 +45,24 @@
             {% else %}
               <button 
                 type="submit" 
-                class="btn btn-success btn-sm {% if not is_sufficient %}disabled{% endif %}"
-                {% if not is_sufficient %}disabled title="Question bank has fewer questions than configured total questions."{% endif %}
+                class="btn btn-success btn-sm {% if not is_sufficient or test.is_cancelled %}disabled{% endif %}"
+                {% if not is_sufficient %}disabled title="Question bank has fewer questions than configured total questions."{% elif test.is_cancelled %}disabled title="Test is cancelled. Uncancel to activate."{% endif %}
               >
                 <i class="bi bi-play-circle me-1"></i> Activate Test
+              </button>
+            {% endif %}
+          </form>
+
+          <!-- Toggle Cancel Form -->
+          <form method="POST" action="{% url 'test_toggle_cancel' test_id=test.test_id %}" class="d-inline">
+            {% csrf_token %}
+            {% if test.is_cancelled %}
+              <button type="submit" class="btn btn-outline-success btn-sm" onclick="return confirm('Uncancel this test and restore access?');">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Uncancel Test
+              </button>
+            {% else %}
+              <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Cancel this assessment? Candidates will not be able to launch or resume it.');">
+                <i class="bi bi-x-circle me-1"></i> Cancel Test
               </button>
             {% endif %}
           </form>
@@ -177,8 +187,10 @@
               </p>
               <hr class="my-3">
               <div class="row g-2 small text-muted">
-                <div class="col-6">Created: <strong>{{ test.created_at|date:"M d, Y" }}</strong></div>
-                <div class="col-6">Last Updated: <strong>{{ test.updated_at|date:"M d, Y" }}</strong></div>
+                <div class="col-sm-6">Created: <strong>{{ test.created_at|date:"M d, Y" }}</strong></div>
+                <div class="col-sm-6">Last Updated: <strong>{{ test.updated_at|date:"M d, Y" }}</strong></div>
+                <div class="col-sm-6">Schedule Start: <strong>{% if test.start_time %}{{ test.start_time|date:"M d, Y H:i" }}{% else %}Immediate{% endif %}</strong></div>
+                <div class="col-sm-6">Schedule End: <strong>{% if test.end_time %}{{ test.end_time|date:"M d, Y H:i" }}{% else %}Open-ended (No Expiry){% endif %}</strong></div>
               </div>
             </div>
           </div>

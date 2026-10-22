@@ -547,3 +547,112 @@ class ProductionHardeningAndSecurityTests(TestCase):
         self.assertEqual(res500.status_code, 500)
         self.assertIn(b'Internal Server Error', res500.content)
 
+
+class AuthenticatedFooterTests(TestCase):
+    """Test suite for mentor-requested authenticated footer across both roles."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = Admin(
+            name="Footer Test Admin",
+            email="footer.admin@test.local"
+        )
+        self.admin.set_password("AdminPass123!")
+        self.admin.save()
+
+        self.candidate = Candidate.objects.create(
+            name="Footer Test Candidate",
+            email="footer.candidate@test.local"
+        )
+
+    def test_authenticated_footer_displayed_for_admin(self):
+        """Admin portal pages display the exact two-line session footer when authenticated."""
+        self.client.post(reverse('admin_login'), {
+            'email': 'footer.admin@test.local',
+            'password': 'AdminPass123!'
+        })
+        response = self.client.get(reverse('admin_dashboard'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+
+        # Check line 1: © 2026 HireScan Test Management Tool. All rights reserved.
+        self.assertTrue(
+            '2026 HireScan Test Management Tool. All rights reserved.' in content and
+            ('&copy;' in content or '©' in content)
+        )
+        # Check line 2: Secure Session Authentication • Role-Based Access Control
+        self.assertTrue(
+            'Secure Session Authentication' in content and
+            'Role-Based Access Control' in content and
+            ('&bull;' in content or '•' in content)
+        )
+
+    def test_authenticated_footer_displayed_for_candidate(self):
+        """Candidate portal pages display the exact two-line session footer when authenticated."""
+        session = self.client.session
+        session['candidate_id'] = str(self.candidate.candidate_id)
+        session['user_role'] = 'candidate'
+        session.save()
+
+        response = self.client.get(reverse('candidate_dashboard'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+
+        # Check line 1: © 2026 HireScan Test Management Tool. All rights reserved.
+        self.assertTrue(
+            '2026 HireScan Test Management Tool. All rights reserved.' in content and
+            ('&copy;' in content or '©' in content)
+        )
+        # Check line 2: Secure Session Authentication • Role-Based Access Control
+        self.assertTrue(
+            'Secure Session Authentication' in content and
+            'Role-Based Access Control' in content and
+            ('&bull;' in content or '•' in content)
+        )
+
+    def test_unauthenticated_page_does_not_display_session_footer(self):
+        """Public homepage does not display authenticated session footer component."""
+        response = self.client.get(reverse('homepage'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+
+        self.assertNotIn('hs-auth-footer', content)
+
+
+class OTPEmailTemplateTests(TestCase):
+    """Test suite for professional responsive HTML OTP email template and fallbacks."""
+
+    def setUp(self):
+        self.client = Client()
+        self.candidate = Candidate.objects.create(
+            name="Email Test Candidate",
+            email="otp.recipient@test.local"
+        )
+
+    def test_otp_email_contains_html_and_plaintext_alternatives(self):
+        """OTP email must deliver both plaintext fallback and professional HTML body."""
+        mail.outbox = []
+        response = self.client.post(reverse('candidate_send_otp'), {
+            'email': 'otp.recipient@test.local'
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+
+        email = mail.outbox[0]
+        self.assertEqual(email.subject, 'HireScan — Your Login OTP')
+        self.assertIn('otp.recipient@test.local', email.to)
+
+        # Plaintext fallback checks
+        self.assertIn('one-time login code is:', email.body)
+        self.assertIn('expires in', email.body)
+
+        # HTML message checks
+        self.assertEqual(len(email.alternatives), 1)
+        html_body, mimetype = email.alternatives[0]
+        self.assertEqual(mimetype, 'text/html')
+        self.assertIn('HireScan', html_body)
+        self.assertIn('Verification Code', html_body)
+        self.assertIn('Do not share this code with anyone.', html_body)
+        self.assertIn('minutes', html_body)
+
+

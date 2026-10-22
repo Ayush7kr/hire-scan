@@ -14,6 +14,9 @@ class Test(models.Model):
     )
     passing_marks = models.PositiveIntegerField(help_text='Minimum marks to pass')
     is_active = models.BooleanField(default=False)
+    start_time = models.DateTimeField(null=True, blank=True, help_text='Scheduled start time for the test window')
+    end_time = models.DateTimeField(null=True, blank=True, help_text='Scheduled end time for the test window')
+    is_cancelled = models.BooleanField(default=False, help_text='Indicates whether the test has been cancelled')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -21,15 +24,104 @@ class Test(models.Model):
         db_table = 'test'
         indexes = [
             models.Index(fields=['is_active'], name='idx_test_active'),
+            models.Index(fields=['is_cancelled'], name='idx_test_cancelled'),
+            models.Index(fields=['start_time'], name='idx_test_start_time'),
         ]
 
     def __str__(self):
-        status = 'Active' if self.is_active else 'Inactive'
-        return f"{self.test_name} ({status})"
+        return f"{self.test_name} ({self.status_display})"
 
     @property
     def question_count(self):
         return self.questions.count()
+
+    @property
+    def status(self):
+        """
+        Derives the overall test status among:
+        - 'cancelled': Explicitly marked as cancelled by an administrator.
+        - 'completed': The scheduled end time has elapsed, or all registered candidates have completed their attempts and test is closed.
+        - 'in_progress': Currently active and within the permitted time window (start_time <= now <= end_time).
+        - 'upcoming': Active/published with a scheduled future start time (now < start_time).
+        - 'scheduled': Configured/drafted with a schedule or pending publication (is_active=False).
+        """
+        from django.utils import timezone
+        now = timezone.now()
+
+        # 1. Cancelled always takes precedence
+        if self.is_cancelled:
+            return 'cancelled'
+
+        # 2. Window-based completion
+        if self.end_time and now > self.end_time:
+            return 'completed'
+
+        # 3. Candidate-based completion: if test has registrations and all are completed/expired,
+        # and test is either inactive or window has ended
+        reg_count = self.registrations.filter(status='registered').count()
+        if reg_count > 0:
+            from attempts.models import TestAttempt
+            completed_attempts = TestAttempt.objects.filter(
+                registration__test=self,
+                registration__status='registered',
+                status__in=['completed', 'expired']
+            ).count()
+            if completed_attempts == reg_count:
+                if not self.is_active or (self.end_time and now >= self.end_time):
+                    return 'completed'
+
+        # 4. Schedule-based statuses
+        if self.start_time:
+            if now < self.start_time:
+                # Future start time
+                return 'upcoming' if self.is_active else 'scheduled'
+            else:
+                # now >= self.start_time
+                if self.end_time and now > self.end_time:
+                    return 'completed'
+                if self.is_active:
+                    return 'in_progress'
+                # Inactive after start_time
+                from attempts.models import TestAttempt
+                if TestAttempt.objects.filter(registration__test=self, status__in=['completed', 'expired']).exists():
+                    return 'completed'
+                return 'scheduled'
+
+        # 5. Default when no explicit start_time is set
+        if self.is_active:
+            return 'in_progress'
+
+        # Inactive without start_time: check if it already ran and completed
+        from attempts.models import TestAttempt
+        if (
+            TestAttempt.objects.filter(registration__test=self, status__in=['completed', 'expired']).exists()
+            and not TestAttempt.objects.filter(registration__test=self, status='in_progress').exists()
+        ):
+            return 'completed'
+
+        return 'scheduled'
+
+    @property
+    def status_display(self):
+        mapping = {
+            'cancelled': 'Cancelled',
+            'completed': 'Completed',
+            'in_progress': 'In Progress',
+            'upcoming': 'Upcoming',
+            'scheduled': 'Scheduled',
+        }
+        return mapping.get(self.status, 'Scheduled')
+
+    @property
+    def status_badge_class(self):
+        mapping = {
+            'cancelled': 'bg-danger-subtle text-danger border border-danger-subtle',
+            'completed': 'bg-primary-subtle text-primary border border-primary-subtle',
+            'in_progress': 'bg-success-subtle text-success border border-success-subtle',
+            'upcoming': 'bg-info-subtle text-info border border-info-subtle',
+            'scheduled': 'bg-secondary-subtle text-secondary border border-secondary-subtle',
+        }
+        return mapping.get(self.status, 'bg-secondary-subtle text-secondary border')
 
 
 class Question(models.Model):

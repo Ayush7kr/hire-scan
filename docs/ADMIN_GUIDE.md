@@ -65,7 +65,9 @@ The Candidate Directory (`/admin/candidates/`) lists all candidates imported int
 
 ![Candidate Roster](screenshots/06_candidate_roster.png)
 
-- **Search & Filter:** Search candidates instantly by name or email.
+- **Multi-Field Server-Side Search:** Search candidates instantly across name, email, WhatsApp number, and college/institution address.
+- **Status Filter:** Filter candidate records by **All Statuses**, **Active**, or **Inactive**.
+- **Pagination State Preservation:** Searching and filtering parameters are preserved across pagination links via URL query string encoding (`?q=...&status=...&page=2`).
 - **Status Controls:** Toggle candidate status between **Active** and **Inactive** with a single click. Inactive candidates cannot request OTPs or start assessments.
 - **Candidate Details:** View assigned tests, historical attempts, and contact information.
 
@@ -91,17 +93,26 @@ Administrators can onboard dozens or hundreds of candidates simultaneously via t
 
 ## 4. Assessment Management & Test Creation
 
-### 4.1 Assessment Roster
-The Tests Roster (`/admin/tests/`) displays all configured technical assessments.
+### 4.1 Assessment Roster & Lifecycle Tracking
+The Tests Roster (`/admin/tests/`) displays all configured technical assessments with real-time lifecycle tracking across five distinct statuses.
 
 ![Tests Roster](screenshots/08_tests_roster.png)
 
-- **Status Badge:** Visual indicator showing whether the assessment is **Draft/Inactive** or **Published/Active**.
+#### 5-Status Test Lifecycle
+| Status | Visual Badge | Business Rule & Transition Conditions |
+| :--- | :--- | :--- |
+| **Cancelled** | Red (`bg-danger-subtle text-danger`) | Test has been explicitly cancelled by an administrator; all access is immediately revoked. |
+| **Completed** | Blue (`bg-primary-subtle text-primary`) | The scheduled test window (`end_time`) has elapsed, or all registered candidates have completed their attempts. |
+| **In Progress** | Green (`bg-success-subtle text-success`) | The test is active and within its permitted time window (`start_time <= now <= end_time`). |
+| **Upcoming** | Cyan (`bg-info-subtle text-info`) | The test is published/active, but the scheduled start time is in the future (`now < start_time`). |
+| **Scheduled** | Grey (`bg-secondary-subtle text-secondary`) | The test is currently in draft/inactive state (`is_active=False`) awaiting publication or start. |
+
+- **Server-Side Status Filtering:** Filter tests by lifecycle status or publication state with instant query parameter preservation.
 - **Question Sufficiency Rule:** Tests **cannot be activated** unless the question bank contains at least `total_questions`. If an administrator attempts to activate an under-resourced test, the system prevents activation and alerts the user.
-- **Actions:** Quick links to manage questions, view candidate attempts, edit test parameters, or toggle publication.
+- **Actions:** Quick links to manage questions, inspect candidate attempts, view test details, edit parameters, or toggle publication.
 
 ### 4.2 Test Creation Wizard
-Creating a new assessment (`/admin/tests/create/`) involves defining testing parameters:
+Creating a new assessment (`/admin/tests/create/`) involves defining testing parameters and optional schedule windows:
 
 ![Test Creation Wizard](screenshots/09_test_creation_wizard.png)
 
@@ -109,7 +120,17 @@ Creating a new assessment (`/admin/tests/create/`) involves defining testing par
 - **Duration (Minutes):** Enforced assessment countdown timer.
 - **Total Questions:** Number of questions randomly assigned to each candidate from the question bank.
 - **Passing Marks:** Minimum score required to achieve a passing grade.
+- **Scheduled Start & End Time (Optional):** Define the precise examination window using localized datetime pickers.
 - **Initial Status:** Defaulted to Inactive until questions are populated.
+
+### 4.3 Test Detail & Cancellation Control
+Administrators can inspect test configurations and toggle cancellation with a single click (`/admin/tests/<test_id>/`):
+
+![Test Detail & Schedule](screenshots/20_test_detail_status_and_schedule.png)
+
+- **Cancellation Toggle:** Cancel active examinations during emergencies or reschedule cancelled tests.
+- **Schedule Window Inspection:** Displays scheduled start and end times in the configured timezone.
+- **Question Bank Sufficiency Breakdown:** Visual indicator of question availability against requirements.
 
 ---
 
@@ -138,13 +159,33 @@ Administrators can rapidly populate question banks using the Question CSV Import
 
 ## 6. Candidate Registrations & Scheduling
 
-The Registrations module (`/admin/registrations/`) bridges candidates and active assessments.
+The Registrations module (`/admin/registrations/`) bridges candidates and active assessments, supporting both individual assignments and high-capacity bulk registrations.
 
 ![Candidate Registrations Roster](screenshots/10_test_registrations.png)
 
-- **Single or Bulk Registration:** Register candidates individually or by cohort to any active assessment.
-- **Uniqueness Constraint:** A candidate can only be registered once per test, preventing duplicate attempts.
-- **Lifecycle Tracking:** Displays registration status (`registered`, `in_progress`, `completed`, `cancelled`).
+### 6.1 Multi-Parameter Search & Filtering
+- **Multi-Field Search:** Locate registrations by candidate name, candidate email, or test title.
+- **Filter by Test:** Narrow down registrations to a specific assessment.
+- **Filter by Registration Status:** Filter by `Registered` or `Cancelled`.
+- **Filter by Attempt Status:** Filter by `Not Started`, `In Progress`, `Completed`, or `Expired`.
+- **Pagination Preservation:** All active filters and search terms are maintained across pages.
+
+### 6.2 High-Capacity Bulk Candidate Registration
+Administrators can assign entire cohorts of candidates to an assessment in a single operation (`/admin/registrations/create/`):
+
+![Bulk Candidate Registration](screenshots/19_bulk_candidate_registration.png)
+
+#### Key Bulk Registration Features
+1. **Dual-Mode Interface:** Switch between **Single Candidate** and **Multiple Candidates (Bulk)** tabs.
+2. **Live Search Filter:** Rapidly filter candidate checkboxes in real time by name, email, or college.
+3. **Select All & Deselect All:** One-click bulk selection controls.
+4. **Selected Candidate Review Tray:** Displays candidate chips with dismissible `×` buttons so administrators can review and prune selections prior to submission.
+5. **Dynamic Count Badge:** Real-time counter showing the exact number of candidates selected for registration.
+6. **Atomic Transaction Commitment:** All candidate assignments are committed within `transaction.atomic()`, preventing partial batch creation upon unexpected database conflicts.
+7. **Transparent Status Reporting:**
+   - **Created:** Reports total registrations successfully added.
+   - **Already Registered:** Identifies candidates who were already registered for the test.
+   - **Rejected:** Reports inactive or ineligible candidate selections with clear explanations.
 
 ---
 

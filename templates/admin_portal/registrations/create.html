@@ -19,16 +19,34 @@
         <ol class="breadcrumb small mb-2">
           <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
           <li class="breadcrumb-item"><a href="{% url 'registration_list' %}" class="text-decoration-none">Registrations</a></li>
-          <li class="breadcrumb-item active" aria-current="page">Register Candidate</li>
+          <li class="breadcrumb-item active" aria-current="page">Register Candidates</li>
         </ol>
       </nav>
 
       <div class="row justify-content-center">
-        <div class="col-lg-7">
+        <div class="col-lg-9 col-xl-8">
           <div class="card border-0 shadow-sm rounded-3">
             <div class="card-header bg-white border-bottom py-3">
-              <h5 class="fw-bold mb-0"><i class="bi bi-person-plus text-primary me-2"></i>Register Candidate for Assessment</h5>
+              <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
+                <h5 class="fw-bold mb-0">
+                  <i class="bi bi-person-plus text-primary me-2"></i>Test Registration
+                </h5>
+                <!-- Mode Toggle Tabs -->
+                <ul class="nav nav-pills card-header-pills small" id="regModeTabs" role="tablist">
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if selected_mode != 'multiple' %}active{% endif %}" id="single-tab" data-bs-toggle="pill" data-bs-target="#single-pane" type="button" role="tab" aria-controls="single-pane" aria-selected="{% if selected_mode != 'multiple' %}true{% else %}false{% endif %}">
+                      <i class="bi bi-person me-1"></i> Single Candidate
+                    </button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if selected_mode == 'multiple' %}active{% endif %}" id="multiple-tab" data-bs-toggle="pill" data-bs-target="#multiple-pane" type="button" role="tab" aria-controls="multiple-pane" aria-selected="{% if selected_mode == 'multiple' %}true{% else %}false{% endif %}">
+                      <i class="bi bi-people me-1"></i> Multiple Candidates (Bulk)
+                    </button>
+                  </li>
+                </ul>
+              </div>
             </div>
+
             <div class="card-body p-4">
               {% if errors.general %}
                 <div class="alert alert-danger py-2 small d-flex align-items-center mb-3">
@@ -37,53 +55,164 @@
                 </div>
               {% endif %}
 
-              <form method="POST" action="{% url 'registration_create' %}" novalidate>
-                {% csrf_token %}
+              <div class="tab-content" id="regModeTabContent">
+                <!-- ================= SINGLE CANDIDATE TAB ================= -->
+                <div class="tab-pane fade {% if selected_mode != 'multiple' %}show active{% endif %}" id="single-pane" role="tabpanel" aria-labelledby="single-tab">
+                  <form method="POST" action="{% url 'registration_create' %}" novalidate>
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="single">
 
-                <!-- Candidate Selection -->
-                <div class="mb-3">
-                  <label for="candSelect" class="form-label">Select Candidate <span class="text-danger">*</span></label>
-                  <select class="form-select {% if errors.candidate_id %}is-invalid{% endif %}" id="candSelect" name="candidate_id" required>
-                    <option value="">— Choose Registered Candidate —</option>
-                    {% for c in candidates %}
-                      <option value="{{ c.candidate_id }}" {% if request.POST.candidate_id == c.candidate_id|stringformat:"s" %}selected{% endif %}>
-                        {{ c.name }} ({{ c.email }})
-                      </option>
-                    {% endfor %}
-                  </select>
-                  {% if errors.candidate_id %}
-                    <div class="invalid-feedback">{{ errors.candidate_id }}</div>
-                  {% endif %}
+                    <!-- Candidate Selection -->
+                    <div class="mb-3">
+                      <label for="candSelect" class="form-label">Select Candidate <span class="text-danger">*</span></label>
+                      <select class="form-select {% if errors.candidate_id %}is-invalid{% endif %}" id="candSelect" name="candidate_id" required>
+                        <option value="">— Choose Registered Candidate —</option>
+                        {% for c in candidates %}
+                          <option value="{{ c.candidate_id }}" {% if request.POST.candidate_id == c.candidate_id|stringformat:"s" %}selected{% endif %}>
+                            {{ c.name }} ({{ c.email }})
+                          </option>
+                        {% endfor %}
+                      </select>
+                      {% if errors.candidate_id %}
+                        <div class="invalid-feedback">{{ errors.candidate_id }}</div>
+                      {% endif %}
+                    </div>
+
+                    <!-- Test Selection -->
+                    <div class="mb-4">
+                      <label for="testSelect" class="form-label">Select Assessment Test <span class="text-danger">*</span></label>
+                      <select class="form-select {% if errors.test_id %}is-invalid{% endif %}" id="testSelect" name="test_id" required>
+                        <option value="">— Choose Target Test —</option>
+                        {% for t in tests %}
+                          <option value="{{ t.test_id }}" {% if request.POST.test_id == t.test_id|stringformat:"s" %}selected{% endif %}>
+                            {{ t.test_name }} ({{ t.duration_minutes }}m &bull; {{ t.total_questions }} Qs)
+                          </option>
+                        {% endfor %}
+                      </select>
+                      {% if errors.test_id %}
+                        <div class="invalid-feedback">{{ errors.test_id }}</div>
+                      {% endif %}
+                    </div>
+
+                    <div class="alert alert-light border py-2 px-3 small text-muted mb-4">
+                      <i class="bi bi-shield-lock me-1"></i>
+                      <strong>Constraint Enforcement:</strong> Candidates cannot be registered more than once for the same test. Attempt records are strictly linked 1:1 to unique registrations.
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                      <a href="{% url 'registration_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                      <button type="submit" class="btn btn-hs-primary">
+                        <i class="bi bi-check2 me-1"></i> Complete Registration
+                      </button>
+                    </div>
+                  </form>
                 </div>
 
-                <!-- Test Selection -->
-                <div class="mb-4">
-                  <label for="testSelect" class="form-label">Select Assessment Test <span class="text-danger">*</span></label>
-                  <select class="form-select {% if errors.test_id %}is-invalid{% endif %}" id="testSelect" name="test_id" required>
-                    <option value="">— Choose Target Test —</option>
-                    {% for t in tests %}
-                      <option value="{{ t.test_id }}" {% if request.POST.test_id == t.test_id|stringformat:"s" %}selected{% endif %}>
-                        {{ t.test_name }} ({{ t.duration_minutes }}m &bull; {{ t.total_questions }} Qs)
-                      </option>
-                    {% endfor %}
-                  </select>
-                  {% if errors.test_id %}
-                    <div class="invalid-feedback">{{ errors.test_id }}</div>
-                  {% endif %}
-                </div>
+                <!-- ================= MULTIPLE CANDIDATES TAB ================= -->
+                <div class="tab-pane fade {% if selected_mode == 'multiple' %}show active{% endif %}" id="multiple-pane" role="tabpanel" aria-labelledby="multiple-tab">
+                  <form method="POST" action="{% url 'registration_create' %}" id="bulkRegistrationForm" novalidate>
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="multiple">
 
-                <div class="alert alert-light border py-2 px-3 small text-muted mb-4">
-                  <i class="bi bi-shield-lock me-1"></i>
-                  <strong>Constraint Enforcement:</strong> Candidates cannot be registered more than once for the same test. Attempt records are strictly linked 1:1 to unique registrations.
-                </div>
+                    <!-- Test Selection -->
+                    <div class="mb-3">
+                      <label for="bulkTestSelect" class="form-label">Select Target Assessment <span class="text-danger">*</span></label>
+                      <select class="form-select {% if errors.test_id %}is-invalid{% endif %}" id="bulkTestSelect" name="test_id" required>
+                        <option value="">— Choose Target Test —</option>
+                        {% for t in tests %}
+                          <option value="{{ t.test_id }}" {% if request.POST.test_id == t.test_id|stringformat:"s" %}selected{% endif %}>
+                            {{ t.test_name }} ({{ t.duration_minutes }}m &bull; {{ t.total_questions }} Qs)
+                          </option>
+                        {% endfor %}
+                      </select>
+                      {% if errors.test_id %}
+                        <div class="invalid-feedback d-block">{{ errors.test_id }}</div>
+                      {% endif %}
+                    </div>
 
-                <div class="d-flex justify-content-end gap-2 pt-3 border-top">
-                  <a href="{% url 'registration_list' %}" class="btn btn-outline-secondary">Cancel</a>
-                  <button type="submit" class="btn btn-hs-primary">
-                    <i class="bi bi-check2 me-1"></i> Complete Registration
-                  </button>
+                    <!-- Search & Bulk Selection Controls -->
+                    <div class="mb-3">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label mb-0">Select Candidates <span class="text-danger">*</span></label>
+                        <div class="d-flex gap-2">
+                          <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2" id="selectAllBtn">
+                            <i class="bi bi-check-all me-1"></i> Select All
+                          </button>
+                          <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" id="deselectAllBtn">
+                            <i class="bi bi-x-circle me-1"></i> Deselect All
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="input-group mb-2">
+                        <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="candSearchInput" placeholder="Filter candidates by name, email, or college...">
+                      </div>
+
+                      {% if errors.candidate_ids %}
+                        <div class="text-danger small mb-2">{{ errors.candidate_ids }}</div>
+                      {% endif %}
+
+                      <!-- Scrollable Candidate Selection List -->
+                      <div class="border rounded-3 p-2 bg-light-subtle" style="max-height: 260px; overflow-y: auto;" id="candidateListContainer">
+                        {% for c in candidates %}
+                          <div class="form-check p-2 rounded candidate-item hover-bg border-bottom mb-1" data-name="{{ c.name|lower }}" data-email="{{ c.email|lower }}" data-college="{{ c.college|default:''|lower }}">
+                            <input 
+                              class="form-check-input bulk-candidate-checkbox ms-0 me-2" 
+                              type="checkbox" 
+                              name="candidate_ids" 
+                              value="{{ c.candidate_id }}" 
+                              id="cand_{{ c.candidate_id }}"
+                              data-id="{{ c.candidate_id }}"
+                              data-name="{{ c.name }}"
+                              data-email="{{ c.email }}"
+                              {% if c.candidate_id|stringformat:"s" in request.POST.getlist.candidate_ids %}checked{% endif %}
+                            >
+                            <label class="form-check-label w-100 cursor-pointer" for="cand_{{ c.candidate_id }}">
+                              <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                  <strong class="text-dark">{{ c.name }}</strong>
+                                  <span class="text-muted small ms-2 font-mono">{{ c.email }}</span>
+                                </div>
+                                {% if c.college %}
+                                  <span class="badge bg-light text-muted border small d-none d-md-inline">{{ c.college }}</span>
+                                {% endif %}
+                              </div>
+                            </label>
+                          </div>
+                        {% empty %}
+                          <div class="text-muted text-center py-4">No active candidates found.</div>
+                        {% endfor %}
+                      </div>
+                    </div>
+
+                    <!-- Selected Candidates Review & Removal Section -->
+                    <div class="card border rounded-3 mb-4 bg-light">
+                      <div class="card-header bg-transparent py-2 d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold small text-dark">
+                          <i class="bi bi-clipboard-check text-primary me-1"></i> Selected for Registration
+                        </span>
+                        <span class="badge bg-primary" id="selectedCountBadge">0 Candidates Selected</span>
+                      </div>
+                      <div class="card-body p-3">
+                        <div id="selectedCandidatesList" class="d-flex flex-wrap gap-2" style="max-height: 160px; overflow-y: auto;">
+                          <p class="text-muted small mb-0 w-100" id="noCandidatesNotice">
+                            <i class="bi bi-info-circle me-1"></i> No candidates selected yet. Check candidates above to include them.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                      <a href="{% url 'registration_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                      <button type="submit" class="btn btn-hs-primary" id="bulkSubmitBtn">
+                        <i class="bi bi-person-plus-fill me-1"></i> Register Selected Candidates
+                      </button>
+                    </div>
+                  </form>
                 </div>
-              </form>
+              </div>
+
             </div>
           </div>
         </div>
@@ -91,4 +220,110 @@
     </div>
   </main>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const checkboxes = document.querySelectorAll('.bulk-candidate-checkbox');
+  const countBadge = document.getElementById('selectedCountBadge');
+  const selectedList = document.getElementById('selectedCandidatesList');
+  const noCandidatesNotice = document.getElementById('noCandidatesNotice');
+  const searchInput = document.getElementById('candSearchInput');
+  const candidateItems = document.querySelectorAll('.candidate-item');
+  const selectAllBtn = document.getElementById('selectAllBtn');
+  const deselectAllBtn = document.getElementById('deselectAllBtn');
+  const bulkSubmitBtn = document.getElementById('bulkSubmitBtn');
+
+  function updateSelectedDisplay() {
+    let selected = [];
+    checkboxes.forEach(cb => {
+      if (cb.checked) {
+        selected.push({
+          id: cb.getAttribute('data-id'),
+          name: cb.getAttribute('data-name'),
+          email: cb.getAttribute('data-email')
+        });
+      }
+    });
+
+    const count = selected.length;
+    countBadge.textContent = `${count} Candidate${count === 1 ? '' : 's'} Selected`;
+    bulkSubmitBtn.innerHTML = `<i class="bi bi-person-plus-fill me-1"></i> Register ${count} Candidate${count === 1 ? '' : 's'}`;
+
+    if (count === 0) {
+      selectedList.innerHTML = '';
+      if (noCandidatesNotice) selectedList.appendChild(noCandidatesNotice);
+    } else {
+      selectedList.innerHTML = '';
+      selected.forEach(cand => {
+        const chip = document.createElement('div');
+        chip.className = 'badge bg-white text-dark border d-inline-flex align-items-center gap-2 py-2 px-3 shadow-sm';
+        chip.innerHTML = `
+          <span><strong>${cand.name}</strong> <small class="text-muted">(${cand.email})</small></span>
+          <button type="button" class="btn-close btn-close-sm remove-cand-chip" aria-label="Remove" data-id="${cand.id}"></button>
+        `;
+        selectedList.appendChild(chip);
+      });
+
+      // Add click listener to chip close buttons
+      selectedList.querySelectorAll('.remove-cand-chip').forEach(btn => {
+        btn.addEventListener('click', function () {
+          const targetId = this.getAttribute('data-id');
+          const targetCb = document.getElementById(`cand_${targetId}`);
+          if (targetCb) {
+            targetCb.checked = false;
+            updateSelectedDisplay();
+          }
+        });
+      });
+    }
+  }
+
+  checkboxes.forEach(cb => {
+    cb.addEventListener('change', updateSelectedDisplay);
+  });
+
+  // Search filter inside candidate list
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      const q = this.value.trim().toLowerCase();
+      candidateItems.forEach(item => {
+        const name = item.getAttribute('data-name') || '';
+        const email = item.getAttribute('data-email') || '';
+        const college = item.getAttribute('data-college') || '';
+        if (!q || name.includes(q) || email.includes(q) || college.includes(q)) {
+          item.style.display = '';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    });
+  }
+
+  // Select all visible candidates
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener('click', function () {
+      candidateItems.forEach(item => {
+        if (item.style.display !== 'none') {
+          const cb = item.querySelector('.bulk-candidate-checkbox');
+          if (cb) cb.checked = true;
+        }
+      });
+      updateSelectedDisplay();
+    });
+  }
+
+  // Deselect all
+  if (deselectAllBtn) {
+    deselectAllBtn.addEventListener('click', function () {
+      checkboxes.forEach(cb => {
+        cb.checked = false;
+      });
+      updateSelectedDisplay();
+    });
+  }
+
+  // Initial trigger
+  updateSelectedDisplay();
+});
+</script>
 {% endblock %}

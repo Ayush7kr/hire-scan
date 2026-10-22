@@ -1146,6 +1146,31 @@ p {
   font-size: 0.82rem;
 }
 
+/* Authenticated Portal Footer (Admin & Candidate) */
+.hs-auth-footer {
+  background: var(--hs-card-bg);
+  border-top: 1px solid var(--hs-border);
+  color: var(--hs-text-muted);
+  padding: 1.25rem 1rem;
+  margin-top: auto;
+  font-size: 0.875rem;
+  text-align: center;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.hs-auth-footer .hs-auth-footer-line1 {
+  font-weight: 500;
+  color: var(--hs-text-main);
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
+}
+
+.hs-auth-footer .hs-auth-footer-line2 {
+  font-size: 0.8125rem;
+  color: var(--hs-text-muted);
+  line-height: 1.4;
+}
+
 /* ==========================================================================
    13. Candidate Assessment & Exam Interface
    ========================================================================== */

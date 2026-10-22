@@ -6,13 +6,16 @@ No Django Forms or ModelForms used — explicit validation applied.
 
 import csv
 import io
+import uuid
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse
 from django.core.paginator import Paginator
 from django.contrib import messages
 from django.db import transaction, IntegrityError
 from django.views.decorators.http import require_http_methods
-from django.db.models import Count, Q
+from django.db.models import Count, Q, F
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from accounts.decorators import admin_required
 from accounts.models import Candidate, ActivityLog
@@ -29,9 +32,10 @@ def test_list(request):
     """
     List all tests with live database metrics:
     duration, questions, passing marks, bank size, registrations, attempts.
+    Supports filtering by the 5 test statuses: Scheduled, Upcoming, In Progress, Completed, Cancelled.
     """
     search_query = request.GET.get('q', '').strip()
-    status_filter = request.GET.get('status', '').strip()
+    status_filter = request.GET.get('status', '').strip().lower()
 
     tests_qs = Test.objects.annotate(
         bank_count=Count('questions', distinct=True),
@@ -44,12 +48,46 @@ def test_list(request):
     ).order_by('-created_at')
 
     if search_query:
-        tests_qs = tests_qs.filter(test_name__icontains=search_query)
+        tests_qs = tests_qs.filter(
+            Q(test_name__icontains=search_query) |
+            Q(description__icontains=search_query)
+        )
 
-    if status_filter == 'active':
-        tests_qs = tests_qs.filter(is_active=True)
+    now = timezone.now()
+    if status_filter == 'cancelled':
+        tests_qs = tests_qs.filter(is_cancelled=True)
+    elif status_filter == 'upcoming':
+        tests_qs = tests_qs.filter(is_cancelled=False, is_active=True, start_time__gt=now)
+    elif status_filter == 'in_progress':
+        tests_qs = tests_qs.filter(
+            is_cancelled=False,
+            is_active=True
+        ).filter(
+            Q(start_time__isnull=True) | Q(start_time__lte=now)
+        ).filter(
+            Q(end_time__isnull=True) | Q(end_time__gte=now)
+        )
+    elif status_filter == 'completed':
+        tests_qs = tests_qs.filter(
+            is_cancelled=False
+        ).filter(
+            Q(end_time__isnull=False, end_time__lt=now) |
+            (Q(is_active=False) & Q(completed_count__gt=0) & Q(completed_count=F('reg_count')))
+        )
+    elif status_filter == 'scheduled':
+        tests_qs = tests_qs.filter(
+            is_cancelled=False
+        ).exclude(
+            Q(is_active=True, start_time__gt=now)
+        ).exclude(
+            Q(is_active=True) & (Q(start_time__isnull=True) | Q(start_time__lte=now)) & (Q(end_time__isnull=True) | Q(end_time__gte=now))
+        ).exclude(
+            Q(end_time__isnull=False, end_time__lt=now)
+        )
+    elif status_filter == 'active':
+        tests_qs = tests_qs.filter(is_active=True, is_cancelled=False)
     elif status_filter == 'inactive':
-        tests_qs = tests_qs.filter(is_active=False)
+        tests_qs = tests_qs.filter(is_active=False, is_cancelled=False)
 
     paginator = Paginator(tests_qs, 10)
     page_number = request.GET.get('page')
@@ -59,10 +97,17 @@ def test_list(request):
     for test in page_obj:
         test.is_sufficient = test.bank_count >= test.total_questions
 
+    # Preserve GET parameters across pagination links
+    params = request.GET.copy()
+    if 'page' in params:
+        del params['page']
+    query_string = params.urlencode()
+
     context = {
         'page_obj': page_obj,
         'search_query': search_query,
         'status_filter': status_filter,
+        'query_string': query_string,
         'total_count': tests_qs.count(),
     }
     return render(request, 'admin_portal/tests/list.html', context)
@@ -160,6 +205,33 @@ def test_create(request):
             except ValueError:
                 errors['passing_marks'] = 'Passing marks must be a valid positive number.'
 
+        # Schedule parsing
+        start_time_raw = request.POST.get('start_time', '').strip()
+        end_time_raw = request.POST.get('end_time', '').strip()
+
+        start_time = None
+        if start_time_raw:
+            dt = parse_datetime(start_time_raw)
+            if dt:
+                if timezone.is_naive(dt):
+                    dt = timezone.make_aware(dt)
+                start_time = dt
+            else:
+                errors['start_time'] = 'Please enter a valid start date and time.'
+
+        end_time = None
+        if end_time_raw:
+            dt = parse_datetime(end_time_raw)
+            if dt:
+                if timezone.is_naive(dt):
+                    dt = timezone.make_aware(dt)
+                end_time = dt
+            else:
+                errors['end_time'] = 'Please enter a valid end date and time.'
+
+        if start_time and end_time and end_time <= start_time:
+            errors['end_time'] = 'End time must be after start time.'
+
         if not errors:
             test = Test.objects.create(
                 test_name=test_name,
@@ -167,6 +239,8 @@ def test_create(request):
                 duration_minutes=duration,
                 total_questions=total_questions,
                 passing_marks=passing_marks,
+                start_time=start_time,
+                end_time=end_time,
                 is_active=False  # starts inactive until bank is uploaded
             )
 
@@ -232,6 +306,34 @@ def test_edit(request, test_id):
         except ValueError:
             errors['passing_marks'] = 'Passing marks must be a valid positive number.'
 
+        # Schedule parsing
+        start_time_raw = request.POST.get('start_time', '').strip()
+        end_time_raw = request.POST.get('end_time', '').strip()
+        is_cancelled = request.POST.get('is_cancelled') in ['1', 'true', 'on', True]
+
+        start_time = None
+        if start_time_raw:
+            dt = parse_datetime(start_time_raw)
+            if dt:
+                if timezone.is_naive(dt):
+                    dt = timezone.make_aware(dt)
+                start_time = dt
+            else:
+                errors['start_time'] = 'Please enter a valid start date and time.'
+
+        end_time = None
+        if end_time_raw:
+            dt = parse_datetime(end_time_raw)
+            if dt:
+                if timezone.is_naive(dt):
+                    dt = timezone.make_aware(dt)
+                end_time = dt
+            else:
+                errors['end_time'] = 'Please enter a valid end date and time.'
+
+        if start_time and end_time and end_time <= start_time:
+            errors['end_time'] = 'End time must be after start time.'
+
         # If test is currently active, ensure question bank satisfies new total questions
         bank_count = Question.objects.filter(test=test).count()
         if test.is_active and total_questions and bank_count < total_questions:
@@ -246,6 +348,11 @@ def test_edit(request, test_id):
             test.duration_minutes = duration
             test.total_questions = total_questions
             test.passing_marks = passing_marks
+            test.start_time = start_time
+            test.end_time = end_time
+            test.is_cancelled = is_cancelled
+            if is_cancelled:
+                test.is_active = False
             test.save()
 
             ActivityLog.objects.create(
@@ -274,6 +381,13 @@ def test_toggle_status(request, test_id):
     """
     test = get_object_or_404(Test, test_id=test_id)
 
+    if test.is_cancelled:
+        messages.error(
+            request,
+            f"Cannot activate '{test.test_name}': Test is cancelled. Please uncancel the test first."
+        )
+        return redirect('test_detail', test_id=test.test_id)
+
     if not test.is_active:
         # Activation check
         bank_count = Question.objects.filter(test=test).count()
@@ -298,9 +412,39 @@ def test_toggle_status(request, test_id):
     ActivityLog.objects.create(
         admin=request.admin_user,
         activity_type=act_type,
-        activity_details=f"Admin set active={test.is_active} for test '{test.test_name}'."
+        activity_details=f"Admin toggled active status for test '{test.test_name}' to {test.is_active}."
     )
+    return redirect('test_detail', test_id=test.test_id)
 
+
+@admin_required
+@require_http_methods(["POST"])
+def test_toggle_cancel(request, test_id):
+    """
+    Cancel or uncancel a test via POST.
+    Cancelled tests cannot be upcoming or in progress, and candidates cannot start them.
+    """
+    test = get_object_or_404(Test, test_id=test_id)
+
+    if not test.is_cancelled:
+        test.is_cancelled = True
+        test.is_active = False
+        test.save()
+        messages.warning(request, f"Test '{test.test_name}' has been CANCELLED.")
+        ActivityLog.objects.create(
+            admin=request.admin_user,
+            activity_type='test_cancelled',
+            activity_details=f"Admin cancelled test '{test.test_name}'."
+        )
+    else:
+        test.is_cancelled = False
+        test.save()
+        messages.success(request, f"Test '{test.test_name}' cancellation has been lifted.")
+        ActivityLog.objects.create(
+            admin=request.admin_user,
+            activity_type='test_uncancelled',
+            activity_details=f"Admin uncancelled test '{test.test_name}'."
+        )
     return redirect('test_detail', test_id=test.test_id)
 
 
@@ -807,10 +951,13 @@ def question_import_error_csv(request):
 def registration_list(request):
     """
     List candidate-to-test registrations with candidate, test, date, status, attempt.
+    Supports searching by candidate name, email, or test name, and filtering by test,
+    registration status, and attempt status with pagination query preservation.
     """
     search_query = request.GET.get('q', '').strip()
     test_filter = request.GET.get('test_id', '').strip()
     status_filter = request.GET.get('status', '').strip()
+    attempt_status = request.GET.get('attempt_status', '').strip()
 
     regs_qs = TestRegistration.objects.all().select_related(
         'candidate', 'test'
@@ -829,6 +976,13 @@ def registration_list(request):
     if status_filter:
         regs_qs = regs_qs.filter(status=status_filter)
 
+    if attempt_status == 'completed':
+        regs_qs = regs_qs.filter(attempt__status='completed')
+    elif attempt_status == 'in_progress':
+        regs_qs = regs_qs.filter(attempt__status='in_progress')
+    elif attempt_status == 'not_attempted':
+        regs_qs = regs_qs.filter(attempt__isnull=True)
+
     all_tests = Test.objects.all().order_by('test_name')
 
     paginator = Paginator(regs_qs, 15)
@@ -837,18 +991,25 @@ def registration_list(request):
 
     # Attach attempt status
     for reg in page_obj:
-        attempt = getattr(reg, 'attempt', None)
         try:
             reg.attempt_obj = reg.attempt
         except Exception:
             reg.attempt_obj = None
+
+    # Preserve GET parameters across pagination links
+    params = request.GET.copy()
+    if 'page' in params:
+        del params['page']
+    query_string = params.urlencode()
 
     context = {
         'page_obj': page_obj,
         'search_query': search_query,
         'test_filter': test_filter,
         'status_filter': status_filter,
+        'attempt_status': attempt_status,
         'all_tests': all_tests,
+        'query_string': query_string,
         'total_count': regs_qs.count(),
     }
     return render(request, 'admin_portal/registrations/list.html', context)
@@ -858,68 +1019,189 @@ def registration_list(request):
 @require_http_methods(["GET", "POST"])
 def registration_create(request):
     """
-    Manually register a candidate for a test with duplicate prevention.
+    Register single or multiple candidates for a test with atomic duplicate prevention.
+    Preserves original single-candidate registration while supporting bulk selection.
     """
     candidates = Candidate.objects.filter(is_active=True).order_by('name')
     tests = Test.objects.all().order_by('test_name')
     errors = {}
+    selected_mode = request.POST.get('mode', 'single')
 
     if request.method == 'POST':
-        candidate_id = request.POST.get('candidate_id', '').strip()
         test_id = request.POST.get('test_id', '').strip()
+        test = None
 
-        if not candidate_id:
-            errors['candidate_id'] = 'Please select a candidate.'
         if not test_id:
             errors['test_id'] = 'Please select a test.'
-
-        candidate = None
-        test = None
-        if candidate_id:
-            try:
-                candidate = Candidate.objects.get(candidate_id=candidate_id)
-            except Candidate.DoesNotExist:
-                errors['candidate_id'] = 'Selected candidate does not exist.'
-
-        if test_id:
+        else:
             try:
                 test = Test.objects.get(test_id=test_id)
-            except Test.DoesNotExist:
+            except (Test.DoesNotExist, ValueError):
                 errors['test_id'] = 'Selected test does not exist.'
 
-        if candidate and test:
-            # Check duplicate registration
-            if TestRegistration.objects.filter(candidate=candidate, test=test).exists():
-                errors['general'] = (
-                    f"Candidate '{candidate.name}' ({candidate.email}) is already registered "
-                    f"for test '{test.test_name}'."
-                )
+        if selected_mode == 'multiple':
+            candidate_ids = request.POST.getlist('candidate_ids')
+            if not candidate_ids:
+                errors['candidate_ids'] = 'Please select at least one candidate.'
 
-        if not errors:
-            try:
-                reg = TestRegistration.objects.create(
-                    candidate=candidate,
-                    test=test,
-                    status='registered'
-                )
-                ActivityLog.objects.create(
-                    admin=request.admin_user,
-                    candidate=candidate,
-                    activity_type='candidate_registered',
-                    activity_details=f"Admin registered {candidate.email} for test '{test.test_name}'."
-                )
-                messages.success(
-                    request,
-                    f"Candidate '{candidate.name}' registered successfully for '{test.test_name}'."
-                )
-                return redirect('registration_list')
-            except IntegrityError:
-                errors['general'] = 'Duplicate registration constraint violated.'
+            if not errors and test:
+                valid_candidates = []
+                rejected = []  # list of (identifier/name, reason)
+                already_registered = []
+
+                # Validate format and existence
+                for cid_raw in candidate_ids:
+                    cid_raw = cid_raw.strip()
+                    if not cid_raw:
+                        continue
+                    try:
+                        cid = uuid.UUID(cid_raw)
+                    except (ValueError, AttributeError):
+                        rejected.append((cid_raw, "Malformed candidate ID"))
+                        continue
+
+                    try:
+                        cand = Candidate.objects.get(candidate_id=cid)
+                    except Candidate.DoesNotExist:
+                        rejected.append((str(cid), "Candidate does not exist"))
+                        continue
+
+                    if not cand.is_active:
+                        rejected.append((f"{cand.name} ({cand.email})", "Candidate is inactive"))
+                        continue
+
+                    valid_candidates.append(cand)
+
+                if valid_candidates:
+                    existing_cand_ids = set(
+                        TestRegistration.objects.filter(
+                            test=test,
+                            candidate__in=valid_candidates
+                        ).values_list('candidate_id', flat=True)
+                    )
+
+                    to_register = []
+                    for cand in valid_candidates:
+                        if cand.candidate_id in existing_cand_ids:
+                            already_registered.append(cand)
+                        else:
+                            to_register.append(cand)
+
+                    # Deduplicate in case candidate_ids contained duplicates within the submission
+                    unique_to_register = []
+                    seen_ids = set()
+                    for cand in to_register:
+                        if cand.candidate_id not in seen_ids:
+                            seen_ids.add(cand.candidate_id)
+                            unique_to_register.append(cand)
+
+                    created_candidates = []
+                    if unique_to_register:
+                        try:
+                            with transaction.atomic():
+                                for cand in unique_to_register:
+                                    TestRegistration.objects.create(
+                                        candidate=cand,
+                                        test=test,
+                                        status='registered'
+                                    )
+                                    ActivityLog.objects.create(
+                                        admin=request.admin_user,
+                                        candidate=cand,
+                                        activity_type='candidate_registered',
+                                        activity_details=f"Admin registered {cand.email} for test '{test.test_name}' (bulk registration)."
+                                    )
+                                    created_candidates.append(cand)
+                        except IntegrityError:
+                            errors['general'] = "A concurrent registration conflict occurred. Please review existing registrations."
+
+                    # Transparent reporting
+                    if created_candidates:
+                        messages.success(
+                            request,
+                            f"Successfully registered {len(created_candidates)} candidate(s) for '{test.test_name}'."
+                        )
+
+                    if already_registered:
+                        already_names = ", ".join([f"{c.name} ({c.email})" for c in already_registered[:5]])
+                        more_ar = f" and {len(already_registered)-5} more" if len(already_registered) > 5 else ""
+                        messages.warning(
+                            request,
+                            f"{len(already_registered)} candidate(s) were already registered for '{test.test_name}': {already_names}{more_ar}."
+                        )
+
+                    if rejected:
+                        rej_msgs = "; ".join([f"{name}: {reason}" for name, reason in rejected[:5]])
+                        more_rej = f" and {len(rejected)-5} more" if len(rejected) > 5 else ""
+                        messages.error(
+                            request,
+                            f"{len(rejected)} candidate selection(s) were rejected: {rej_msgs}{more_rej}."
+                        )
+
+                    if created_candidates and not errors.get('general'):
+                        return redirect('registration_list')
+                    elif not created_candidates and not errors.get('general'):
+                        if already_registered and not rejected:
+                            errors['general'] = f"All {len(already_registered)} selected candidate(s) are already registered for '{test.test_name}'."
+                        elif rejected and not already_registered:
+                            errors['general'] = "All selected candidate(s) were rejected."
+                        else:
+                            errors['general'] = f"No registrations created. {len(already_registered)} already registered, {len(rejected)} rejected."
+                elif rejected:
+                    rej_msgs = "; ".join([f"{name}: {reason}" for name, reason in rejected[:5]])
+                    errors['general'] = f"Selected candidate(s) rejected: {rej_msgs}."
+
+        else:
+            # Single candidate registration (strictly preserving original logic and response messages)
+            candidate_id = request.POST.get('candidate_id', '').strip()
+
+            if not candidate_id:
+                errors['candidate_id'] = 'Please select a candidate.'
+
+            candidate = None
+            if candidate_id:
+                try:
+                    candidate = Candidate.objects.get(candidate_id=candidate_id)
+                    if not candidate.is_active:
+                        errors['candidate_id'] = 'Selected candidate is inactive.'
+                except (Candidate.DoesNotExist, ValueError):
+                    errors['candidate_id'] = 'Selected candidate does not exist.'
+
+            if candidate and test:
+                # Check duplicate registration
+                if TestRegistration.objects.filter(candidate=candidate, test=test).exists():
+                    errors['general'] = (
+                        f"Candidate '{candidate.name}' ({candidate.email}) is already registered "
+                        f"for test '{test.test_name}'."
+                    )
+
+            if not errors and candidate and test:
+                try:
+                    with transaction.atomic():
+                        reg = TestRegistration.objects.create(
+                            candidate=candidate,
+                            test=test,
+                            status='registered'
+                        )
+                        ActivityLog.objects.create(
+                            admin=request.admin_user,
+                            candidate=candidate,
+                            activity_type='candidate_registered',
+                            activity_details=f"Admin registered {candidate.email} for test '{test.test_name}'."
+                        )
+                    messages.success(
+                        request,
+                        f"Candidate '{candidate.name}' registered successfully for '{test.test_name}'."
+                    )
+                    return redirect('registration_list')
+                except IntegrityError:
+                    errors['general'] = 'Duplicate registration constraint violated.'
 
     context = {
         'candidates': candidates,
         'tests': tests,
         'errors': errors,
+        'selected_mode': selected_mode,
     }
     return render(request, 'admin_portal/registrations/create.html', context)
 

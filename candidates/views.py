@@ -14,7 +14,7 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.db import transaction, IntegrityError
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.views.decorators.http import require_http_methods
 
 from accounts.decorators import admin_required
@@ -26,27 +26,44 @@ from assessments.models import Test, TestRegistration
 def candidate_list(request):
     """
     Display a paginated, searchable list of candidates.
+    Supports filtering by active / inactive status and preserving query parameters across pagination.
     Uses database annotation for registration count to prevent N+1 queries.
     """
     search_query = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status', '').strip().lower()
+
     candidates_qs = Candidate.objects.annotate(
         reg_count=Count('registrations')
     ).order_by('-created_at')
 
     if search_query:
         candidates_qs = candidates_qs.filter(
-            name__icontains=search_query
-        ) | candidates_qs.filter(
-            email__icontains=search_query
+            Q(name__icontains=search_query) |
+            Q(email__icontains=search_query) |
+            Q(whatsapp_number__icontains=search_query) |
+            Q(college_name_address__icontains=search_query)
         )
+
+    if status_filter == 'active':
+        candidates_qs = candidates_qs.filter(is_active=True)
+    elif status_filter == 'inactive':
+        candidates_qs = candidates_qs.filter(is_active=False)
 
     paginator = Paginator(candidates_qs, 15)  # 15 candidates per page
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Preserve GET parameters across pagination links
+    params = request.GET.copy()
+    if 'page' in params:
+        del params['page']
+    query_string = params.urlencode()
+
     context = {
         'page_obj': page_obj,
         'search_query': search_query,
+        'status_filter': status_filter,
+        'query_string': query_string,
         'total_count': candidates_qs.count(),
     }
     return render(request, 'admin_portal/candidates/list.html', context)

@@ -56,8 +56,14 @@ To eliminate vulnerable passwords and credential sharing, HireScan utilizes pass
 
 ### Step-by-Step Login Instructions
 1. **Enter Registered Email:** Provide the exact email address registered for you by the test administrator.
-2. **Request One-Time Password:** Click **"Send Verification Code"**. The system sends a 6-digit numeric OTP to your email inbox.
-3. **Enter OTP Code:** Type the 6-digit code received into the verification field and click **"Verify & Continue"**.
+2. **Request One-Time Password:** Click **"Send Verification Code"**. The system generates a 6-digit numeric OTP and dispatches a professional, branded verification email.
+3. **Professional Email Template:** The email is delivered with a responsive HTML design featuring:
+   - HireScan branding and security banner.
+   - High-contrast, centered 6-digit OTP code box.
+   - Exact local expiry timestamp and remaining valid duration.
+   - Prominent security alert warning recipients never to share their code.
+   - Plain-text fallback for email clients that do not render HTML.
+4. **Enter OTP Code:** Type the 6-digit code received into the verification field and click **"Verify & Continue"**.
 
 ### Security & Throttling Guardrails
 - **5-Minute Expiry (TTL):** Each OTP expires automatically after 5 minutes.
@@ -65,6 +71,7 @@ To eliminate vulnerable passwords and credential sharing, HireScan utilizes pass
 - **Brute-Force Protection:** Maximum of 3 failed attempts per OTP code before it is permanently invalidated.
 - **Cryptographic Hashing:** OTPs are never stored in plaintext; they are hashed using PBKDF2 with SHA-256 before database insertion.
 - **Anti-Enumeration Protection:** If an unregistered email is entered, the interface returns a neutral message without disclosing account existence.
+- **Zero Log Exposure:** Verification codes are excluded from application error logs and server response payloads.
 
 ---
 
@@ -74,11 +81,18 @@ Upon successful verification, candidates are redirected to their personalized da
 
 ### Dashboard Features
 - **Candidate Profile:** Displays candidate name, email, and institution.
-- **Assigned Assessments Table:** Lists all examinations linked to the candidate:
+- **Authenticated Session Footer:** Displays the two-line security footer:
+  - `© 2026 HireScan Test Management Tool. All rights reserved.`
+  - `Secure Session Authentication • Role-Based Access Control`
+- **Assigned Assessments Table:** Lists all examinations linked to the candidate with real-time test status:
   - **Test Title & Description:** Subject domain and instructions.
-  - **Duration & Total Questions:** Assessment parameters.
-  - **Action Button:**
-    - **"Start Assessment"**: Available for newly assigned, active examinations.
+  - **Test Lifecycle Status Badge:** Displays the overarching test status (**Upcoming**, **In Progress**, **Completed**, or **Cancelled**).
+  - **Schedule Window:** Displays configured start and end dates/times in your local timezone.
+  - **Dynamic Action Button & Eligibility Gating:**
+    - **"Start Assessment"**: Available only when the test is **In Progress** and within the valid examination window.
+    - **"Upcoming (Opens at ...)"**: Disabled button informing examinees when the test window opens.
+    - **"Window Ended"**: Disabled button indicating the test submission period has closed.
+    - **"Cancelled"**: Disabled button indicating administrator cancellation.
     - **"Resume Assessment"**: Appears if an in-progress attempt has remaining time.
     - **"View Results"**: Available once the assessment has been submitted and scored.
 

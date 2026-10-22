@@ -31,8 +31,22 @@ def validate_candidate_eligibility(candidate, registration):
         return False, f"Registration status is '{registration.status}' and cannot be accessed."
 
     test = registration.test
+    if test.is_cancelled:
+        return False, "This assessment has been cancelled."
+
     if not test.is_active:
         return False, "This assessment is currently inactive and unavailable."
+
+    now = timezone.now()
+    if test.start_time and now < test.start_time:
+        start_time_str = timezone.localtime(test.start_time).strftime('%B %d, %Y at %I:%M %p')
+        return False, f"This assessment is upcoming and will open on {start_time_str}."
+
+    if test.end_time and now > test.end_time:
+        return False, "The examination window for this assessment has ended."
+
+    if test.status == 'completed':
+        return False, "This assessment is completed and closed for new attempts."
 
     available_questions = test.questions.count()
     if available_questions < test.total_questions:

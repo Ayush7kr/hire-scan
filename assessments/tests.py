@@ -1,6 +1,8 @@
 import io
+from datetime import timedelta
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import Admin, Candidate, ActivityLog
 from assessments.models import Test, Question, TestRegistration
@@ -316,3 +318,286 @@ class RegistrationManagementTests(TestCase):
 
         reg.refresh_from_db()
         self.assertEqual(reg.status, 'registered')  # Must remain registered!
+
+
+class BulkRegistrationTests(TestCase):
+    """Test suite for mentor-requested multiple candidate selection in test registration."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = Admin(name="Bulk Admin", email="bulk.admin@test.local")
+        self.admin.set_password("AdminPass123!")
+        self.admin.save()
+        self.client.post(reverse('admin_login'), {
+            'email': 'bulk.admin@test.local',
+            'password': 'AdminPass123!'
+        })
+
+        self.test = Test.objects.create(
+            test_name="Full-Stack Registration Assessment",
+            duration_minutes=30,
+            total_questions=10,
+            passing_marks=6,
+            is_active=True
+        )
+
+        self.cand1 = Candidate.objects.create(name="Candidate One", email="cand1@test.local", is_active=True)
+        self.cand2 = Candidate.objects.create(name="Candidate Two", email="cand2@test.local", is_active=True)
+        self.cand3 = Candidate.objects.create(name="Candidate Three", email="cand3@test.local", is_active=True)
+        self.cand_inactive = Candidate.objects.create(name="Inactive Candidate", email="inactive@test.local", is_active=False)
+
+    def test_bulk_registration_success(self):
+        """Admin can select and register multiple active candidates in a single atomic transaction."""
+        response = self.client.post(reverse('registration_create'), {
+            'mode': 'multiple',
+            'test_id': str(self.test.test_id),
+            'candidate_ids': [str(self.cand1.candidate_id), str(self.cand2.candidate_id), str(self.cand3.candidate_id)]
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(TestRegistration.objects.filter(test=self.test).count(), 3)
+        self.assertTrue(TestRegistration.objects.filter(test=self.test, candidate=self.cand1).exists())
+        self.assertTrue(TestRegistration.objects.filter(test=self.test, candidate=self.cand2).exists())
+        self.assertTrue(TestRegistration.objects.filter(test=self.test, candidate=self.cand3).exists())
+
+    def test_bulk_registration_partial_duplicates_reported_clearly(self):
+        """If one candidate is already registered, new candidates are registered and duplicate is reported with warning."""
+        TestRegistration.objects.create(test=self.test, candidate=self.cand1, status='registered')
+
+        response = self.client.post(reverse('registration_create'), {
+            'mode': 'multiple',
+            'test_id': str(self.test.test_id),
+            'candidate_ids': [str(self.cand1.candidate_id), str(self.cand2.candidate_id)]
+        }, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        # cand2 created, cand1 duplicate reported
+        self.assertEqual(TestRegistration.objects.filter(test=self.test).count(), 2)
+        content = response.content.decode('utf-8')
+        self.assertIn('Successfully registered 1 candidate', content)
+        self.assertIn('already registered', content)
+
+    def test_bulk_registration_rejects_inactive_candidates(self):
+        """Inactive candidates are rejected with clear rejection reason."""
+        response = self.client.post(reverse('registration_create'), {
+            'mode': 'multiple',
+            'test_id': str(self.test.test_id),
+            'candidate_ids': [str(self.cand_inactive.candidate_id)]
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(TestRegistration.objects.filter(test=self.test).count(), 0)
+        content = response.content.decode('utf-8')
+        self.assertIn('Candidate is inactive', content)
+
+    def test_bulk_registration_rejects_malformed_candidate_id(self):
+        """Malformed UUID string is caught safely without unhandled exception."""
+        response = self.client.post(reverse('registration_create'), {
+            'mode': 'multiple',
+            'test_id': str(self.test.test_id),
+            'candidate_ids': ['not-a-valid-uuid-12345']
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(TestRegistration.objects.filter(test=self.test).count(), 0)
+        content = response.content.decode('utf-8')
+        self.assertIn('Malformed candidate ID', content)
+
+    def test_bulk_registration_rejects_empty_selection(self):
+        """Empty candidate selection triggers clear validation error."""
+        response = self.client.post(reverse('registration_create'), {
+            'mode': 'multiple',
+            'test_id': str(self.test.test_id),
+            'candidate_ids': []
+        })
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        self.assertIn('Please select at least one candidate', content)
+
+
+class TestStatusTrackingTests(TestCase):
+    """Test suite for the 5 mentor-requested test statuses and time-boundary rules."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = Admin(name="Status Admin", email="status.admin@test.local")
+        self.admin.set_password("AdminPass123!")
+        self.admin.save()
+        self.client.post(reverse('admin_login'), {
+            'email': 'status.admin@test.local',
+            'password': 'AdminPass123!'
+        })
+
+    def test_status_cancelled_precedence(self):
+        """Cancelled tests always have status 'cancelled' regardless of schedule or active flag."""
+        now = timezone.now()
+        test = Test.objects.create(
+            test_name="Cancelled Assessment",
+            duration_minutes=30,
+            total_questions=10,
+            passing_marks=6,
+            start_time=now - timedelta(days=1),
+            end_time=now + timedelta(days=1),
+            is_active=True,
+            is_cancelled=True
+        )
+        self.assertEqual(test.status, 'cancelled')
+        self.assertEqual(test.status_display, 'Cancelled')
+
+    def test_status_completed_when_end_time_passed(self):
+        """Active test whose end_time has passed has status 'completed'."""
+        now = timezone.now()
+        test = Test.objects.create(
+            test_name="Expired Assessment",
+            duration_minutes=30,
+            total_questions=10,
+            passing_marks=6,
+            start_time=now - timedelta(days=2),
+            end_time=now - timedelta(minutes=5),
+            is_active=True,
+            is_cancelled=False
+        )
+        self.assertEqual(test.status, 'completed')
+        self.assertEqual(test.status_display, 'Completed')
+
+    def test_status_upcoming_when_start_time_in_future(self):
+        """Active test whose start_time is in the future has status 'upcoming'."""
+        now = timezone.now()
+        test = Test.objects.create(
+            test_name="Upcoming Assessment",
+            duration_minutes=30,
+            total_questions=10,
+            passing_marks=6,
+            start_time=now + timedelta(hours=2),
+            end_time=now + timedelta(hours=5),
+            is_active=True,
+            is_cancelled=False
+        )
+        self.assertEqual(test.status, 'upcoming')
+        self.assertEqual(test.status_display, 'Upcoming')
+
+    def test_status_in_progress_during_active_window(self):
+        """Active test within [start_time, end_time] has status 'in_progress'."""
+        now = timezone.now()
+        test = Test.objects.create(
+            test_name="Live Assessment",
+            duration_minutes=30,
+            total_questions=10,
+            passing_marks=6,
+            start_time=now - timedelta(minutes=15),
+            end_time=now + timedelta(minutes=45),
+            is_active=True,
+            is_cancelled=False
+        )
+        self.assertEqual(test.status, 'in_progress')
+        self.assertEqual(test.status_display, 'In Progress')
+
+    def test_status_scheduled_when_inactive(self):
+        """Test with is_active=False is considered 'scheduled'."""
+        test = Test.objects.create(
+            test_name="Draft Scheduled Assessment",
+            duration_minutes=30,
+            total_questions=10,
+            passing_marks=6,
+            is_active=False,
+            is_cancelled=False
+        )
+        self.assertEqual(test.status, 'scheduled')
+        self.assertEqual(test.status_display, 'Scheduled')
+
+    def test_admin_toggle_cancel_test_action(self):
+        """Admin can cancel and uncancel a test via POST action."""
+        test = Test.objects.create(
+            test_name="Cancelable Assessment",
+            duration_minutes=30,
+            total_questions=10,
+            passing_marks=6,
+            is_active=True
+        )
+        # Cancel
+        res1 = self.client.post(reverse('test_toggle_cancel', kwargs={'test_id': test.test_id}))
+        self.assertEqual(res1.status_code, 302)
+        test.refresh_from_db()
+        self.assertTrue(test.is_cancelled)
+        self.assertFalse(test.is_active)
+        self.assertEqual(test.status, 'cancelled')
+
+        # Uncancel
+        res2 = self.client.post(reverse('test_toggle_cancel', kwargs={'test_id': test.test_id}))
+        self.assertEqual(res2.status_code, 302)
+        test.refresh_from_db()
+        self.assertFalse(test.is_cancelled)
+
+
+class SearchAndFilterTests(TestCase):
+    """Test suite for server-side search, filtering, and query string preservation."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = Admin(name="Search Admin", email="search.admin@test.local")
+        self.admin.set_password("AdminPass123!")
+        self.admin.save()
+        self.client.post(reverse('admin_login'), {
+            'email': 'search.admin@test.local',
+            'password': 'AdminPass123!'
+        })
+
+        self.test_py = Test.objects.create(
+            test_name="Python Automation",
+            duration_minutes=30,
+            total_questions=10,
+            passing_marks=6,
+            is_active=True
+        )
+        self.test_js = Test.objects.create(
+            test_name="JavaScript React",
+            duration_minutes=30,
+            total_questions=10,
+            passing_marks=6,
+            is_active=False
+        )
+
+        self.cand_alice = Candidate.objects.create(name="Alice Walker", email="alice.walker@test.local", is_active=True)
+        self.cand_bob = Candidate.objects.create(name="Bob Smith", email="bob.smith@test.local", is_active=True)
+
+        self.reg_alice = TestRegistration.objects.create(test=self.test_py, candidate=self.cand_alice, status='registered')
+        self.reg_bob = TestRegistration.objects.create(test=self.test_js, candidate=self.cand_bob, status='cancelled')
+
+    def test_search_registrations_by_candidate_name_and_test(self):
+        """Admin can search registrations by candidate name or test title."""
+        # Search candidate name
+        res1 = self.client.get(reverse('registration_list'), {'q': 'Alice'})
+        self.assertContains(res1, 'Alice Walker')
+        self.assertNotContains(res1, 'Bob Smith')
+
+        # Search test name
+        res2 = self.client.get(reverse('registration_list'), {'q': 'JavaScript'})
+        self.assertContains(res2, 'Bob Smith')
+        self.assertNotContains(res2, 'Alice Walker')
+        self.assertIn(self.reg_bob, res2.context['page_obj'])
+        self.assertNotIn(self.reg_alice, res2.context['page_obj'])
+
+    def test_filter_registrations_by_status(self):
+        """Admin can filter registrations by status."""
+        res_cancelled = self.client.get(reverse('registration_list'), {'status': 'cancelled'})
+        self.assertContains(res_cancelled, 'Bob Smith')
+        self.assertNotContains(res_cancelled, 'Alice Walker')
+
+        res_registered = self.client.get(reverse('registration_list'), {'status': 'registered'})
+        self.assertContains(res_registered, 'Alice Walker')
+        self.assertNotContains(res_registered, 'Bob Smith')
+
+    def test_test_list_filter_by_status(self):
+        """Admin can filter tests by derived test status."""
+        res_sched = self.client.get(reverse('test_list'), {'status': 'scheduled'})
+        self.assertContains(res_sched, 'JavaScript React')
+        self.assertNotContains(res_sched, 'Python Automation')
+
+        res_prog = self.client.get(reverse('test_list'), {'status': 'in_progress'})
+        self.assertContains(res_prog, 'Python Automation')
+        self.assertNotContains(res_prog, 'JavaScript React')
+
+    def test_pagination_preserves_query_parameters(self):
+        """Context provides query_string preserving search and filter criteria for pagination links."""
+        res = self.client.get(reverse('registration_list'), {'q': 'Alice', 'status': 'registered'})
+        self.assertIn('query_string', res.context)
+        self.assertIn('q=Alice', res.context['query_string'])
+        self.assertIn('status=registered', res.context['query_string'])
+

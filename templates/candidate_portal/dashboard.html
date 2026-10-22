@@ -37,29 +37,32 @@
             <div class="card-body p-4">
               <div class="d-flex justify-content-between align-items-start mb-3">
                 <h5 class="fw-bold mb-0 text-dark">{{ item.test.test_name }}</h5>
-                {% if item.attempt %}
-                  {% if item.attempt.status == 'completed' %}
-                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
-                      <i class="bi bi-check-circle-fill me-1"></i> Completed
-                    </span>
-                  {% elif item.attempt.status == 'in_progress' %}
-                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1">
-                      <i class="bi bi-hourglass-split me-1"></i> In Progress
-                    </span>
+                <div class="d-flex flex-column align-items-end gap-1">
+                  <!-- Assessment Status -->
+                  <span class="badge {{ item.test.status_badge_class }} px-2 py-1">
+                    {{ item.test.status_display }}
+                  </span>
+                  <!-- Candidate Attempt Status -->
+                  {% if item.attempt %}
+                    {% if item.attempt.status == 'completed' %}
+                      <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 small">
+                        <i class="bi bi-check-circle-fill me-1"></i> Attempt Completed
+                      </span>
+                    {% elif item.attempt.status == 'in_progress' %}
+                      <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 small">
+                        <i class="bi bi-hourglass-split me-1"></i> Attempt In Progress
+                      </span>
+                    {% else %}
+                      <span class="badge bg-secondary-subtle text-secondary px-2 py-1 small">
+                        {{ item.attempt.status|title }}
+                      </span>
+                    {% endif %}
                   {% else %}
-                    <span class="badge bg-secondary-subtle text-secondary px-2 py-1">
-                      {{ item.attempt.status|title }}
+                    <span class="badge bg-light text-muted border px-2 py-1 small">
+                      Not Attempted
                     </span>
                   {% endif %}
-                {% elif item.test.is_active %}
-                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
-                    <i class="bi bi-lightning-charge-fill me-1"></i> Ready to Start
-                  </span>
-                {% else %}
-                  <span class="badge bg-secondary-subtle text-secondary px-2 py-1">
-                    Not Yet Active
-                  </span>
-                {% endif %}
+                </div>
               </div>
 
               <p class="text-muted small mb-3">
@@ -101,7 +104,15 @@
                   </a>
                 {% else %}
                   <button class="btn btn-secondary w-100 disabled" disabled>
-                    <i class="bi bi-lock-fill me-1"></i> Assessment Unavailable
+                    {% if item.test.status == 'upcoming' and item.test.start_time %}
+                      <i class="bi bi-clock-history me-1"></i> Starts {{ item.test.start_time|date:"M d, H:i" }}
+                    {% elif item.test.status == 'cancelled' %}
+                      <i class="bi bi-x-circle me-1"></i> Assessment Cancelled
+                    {% elif item.test.status == 'completed' %}
+                      <i class="bi bi-lock-fill me-1"></i> Assessment Window Closed
+                    {% else %}
+                      <i class="bi bi-lock-fill me-1"></i> Assessment Unavailable
+                    {% endif %}
                   </button>
                 {% endif %}
               </div>

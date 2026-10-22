@@ -5,7 +5,7 @@
 [![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white)](https://getbootstrap.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-131%20Passed%20(100%25)-success?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/Ayush7kr/hire-scan)
+[![Tests](https://img.shields.io/badge/Tests-153%20Passed%20(100%25)-success?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/Ayush7kr/hire-scan)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 HireScan is a secure, high-performance, enterprise-grade technical assessment and test management tool. Engineered with Django and Python, HireScan automates candidate onboarding, conducts timed, randomized examinations with zero answer leakage, and delivers executive psychometric and competency analytics.
@@ -28,7 +28,7 @@ HireScan includes an eye-friendly, high-contrast theme system with a centralized
 | Candidate Passwordless OTP Sign-In | Administrator Secure Sign-In |
 | :---: | :---: |
 | ![Candidate OTP Login](docs/screenshots/03_candidate_login.png) | ![Admin Login](docs/screenshots/04_admin_login.png) |
-| *Cryptographic 6-digit email OTP with PBKDF2 hashing, 5-minute TTL & anti-enumeration.* | *Dedicated, isolated admin gateway with CSRF defense and session protection.* |
+| *Cryptographic 6-digit email OTP with PBKDF2 hashing, 5-minute TTL, responsive HTML template & anti-enumeration.* | *Dedicated, isolated admin gateway with CSRF defense, session protection, and role-based access.* |
 
 ---
 
@@ -37,7 +37,25 @@ HireScan includes an eye-friendly, high-contrast theme system with a centralized
 | Executive Dashboard with Independent Scroll Stream | Candidate Directory & Status Control |
 | :---: | :---: |
 | ![Admin Dashboard](docs/screenshots/05_admin_dashboard.png) | ![Candidate Roster](docs/screenshots/06_candidate_roster.png) |
-| *Real-time KPI metrics with an independently scrollable live audit activity log.* | *Complete candidate directory with search, filtering, and instant active status toggling.* |
+| *Real-time KPI metrics with an independently scrollable live audit activity log and 2-line authenticated footer.* | *Candidate directory with multi-field search, active/inactive filters, and instant status toggling.* |
+
+---
+
+### Assessment Lifecycle Tracking & Schedule Windows
+
+| Tests Roster with 5 Lifecycle Statuses | Test Detail, Schedule Window & Cancellation |
+| :---: | :---: |
+| ![Tests Roster](docs/screenshots/08_tests_roster.png) | ![Test Detail & Schedule](docs/screenshots/20_test_detail_status_and_schedule.png) |
+| *Track tests across 5 lifecycle statuses: Scheduled, Upcoming, In Progress, Completed, and Cancelled with instant filtering.* | *Detailed inspection of test parameters, start/end schedule windows, sufficiency validation, and cancellation toggle.* |
+
+---
+
+### Candidate Registration: Single & High-Capacity Bulk Operations
+
+| Bulk Candidate Registration with Review Tray | Test Registrations with Multi-Parameter Filters |
+| :---: | :---: |
+| ![Bulk Candidate Registration](docs/screenshots/19_bulk_candidate_registration.png) | ![Test Registrations Roster](docs/screenshots/10_test_registrations.png) |
+| *Tabbed registration: candidate checkboxes, live search filter, select-all, count badge, and dismissible candidate review chips.* | *Search by candidate or test name, filter by test, registration status, and attempt completion state.* |
 
 ---
 
@@ -46,7 +64,7 @@ HireScan includes an eye-friendly, high-contrast theme system with a centralized
 | Candidate Bulk CSV Import Wizard | Assessment Configuration Wizard |
 | :---: | :---: |
 | ![Candidate Import](docs/screenshots/07_candidate_import.png) | ![Test Creation Wizard](docs/screenshots/09_test_creation_wizard.png) |
-| *Atomic batch onboarding with validation, deduplication, and downloadable error reports.* | *Configure countdown timers, question pools, passing thresholds, and activation safeguards.* |
+| *Atomic batch onboarding with validation, deduplication, and downloadable error reports.* | *Configure countdown timers, question pools, passing thresholds, and start/end schedule windows.* |
 
 | Question Bank Management | Bulk Question CSV Import Wizard |
 | :---: | :---: |
@@ -84,9 +102,27 @@ Dive deeper into every facet of HireScan with our dedicated guides:
 ## ⚡ Key Highlights & Core Features
 
 - **No Django Admin Dependency:** All administrative tools and workflows are custom-built with targeted business logic, responsive UI, and granular auditing.
-- **Strict Role Separation:**
+- **Strict Role Separation & Authenticated Footer:**
   - **Administrators:** Provisioned via secure CLI, protected by PBKDF2 password hashing and HTTP-only session cookies.
   - **Candidates:** 100% passwordless authentication via cryptographic 6-digit email OTPs with 5-minute TTL, 60s cooldown, and 3-attempt invalidation.
+  - **Branded Session Footer:** Uniform 2-line authenticated footer (`© 2026 HireScan Test Management Tool. All rights reserved.` / `Secure Session Authentication • Role-Based Access Control`) across all logged-in views in both light and dark themes.
+- **Dynamic 5-Status Test Lifecycle Tracking:**
+  - Tests dynamically transition between **Scheduled**, **Upcoming**, **In Progress**, **Completed**, and **Cancelled** based on schedule windows (`start_time`, `end_time`), activation state, and cancellation flags.
+  - Candidate eligibility gating prevents launching upcoming, expired, or cancelled assessments.
+  - One-click administrator cancellation toggle with immediate audit logging.
+- **Dual-Mode Candidate Registration (Single & High-Capacity Bulk):**
+  - Seamlessly select and register single candidates or onboard multiple candidates simultaneously.
+  - Interactive multi-select UI with live search, select-all/deselect-all helpers, selection counters, and dismissible candidate review chips.
+  - Atomic database transactions (`transaction.atomic()`), duplicate detection, and transparent reporting of created, existing, and rejected candidates.
+- **Server-Side Multi-Field Search & Dynamic Filtering:**
+  - **Candidates:** Search by name, email, phone/WhatsApp, and college; filter by Active/Inactive status.
+  - **Tests:** Search by title and description; filter across all 5 test statuses.
+  - **Registrations:** Search by candidate name/email and test name; filter by test, registration status, and attempt status.
+  - Preserves search and filter parameters across pagination via URL query string encoding.
+- **Professional Branded OTP Email System:**
+  - Clean, responsive HTML email template with HireScan branding, high-visibility OTP display box, local expiry notice, and security warnings.
+  - Full plain-text fallback for maximum client compatibility.
+  - Strict confidentiality: OTPs are never exposed in application logs or client payloads.
 - **Zero-Answer-Leak Architecture:** Correct answers are **never** delivered to client browsers during assessments. Scoring occurs strictly server-side within atomic database transactions.
 - **Resilient Assessment Engine:**
   - Automated question randomization and stable per-attempt ordering.
@@ -107,7 +143,7 @@ Dive deeper into every facet of HireScan with our dedicated guides:
   - Multi-stage `Dockerfile` running as non-root user (`hirescan`).
   - `docker-compose.yml` orchestrating PostgreSQL 16 and Gunicorn WSGI.
   - Automated health check probes (`/health/`, `/healthz/`).
-  - GitHub Actions CI workflow executing linting, PostgreSQL migrations, and 131 automated tests.
+  - GitHub Actions CI workflow executing linting, PostgreSQL migrations, and 153 automated tests.
 
 ---
 
@@ -168,6 +204,9 @@ erDiagram
         int total_questions
         int passing_marks
         boolean is_active
+        datetime start_time
+        datetime end_time
+        boolean is_cancelled
         datetime created_at
     }
 
