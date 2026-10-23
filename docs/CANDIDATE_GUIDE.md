@@ -73,6 +73,15 @@ To eliminate vulnerable passwords and credential sharing, HireScan utilizes pass
 - **Anti-Enumeration Protection:** If an unregistered email is entered, the interface returns a neutral message without disclosing account existence.
 - **Zero Log Exposure:** Verification codes are excluded from application error logs and server response payloads.
 
+### 3.1 Automated Assessment Notifications & Reminders
+Beyond login OTPs, HireScan automatically delivers branded email notifications for key examination events:
+- **Registration Confirmation:** Sent immediately when an administrator registers you for a new assessment, detailing the test title, duration, question count, and schedule window.
+- **Assessment Availability Alert:** Sent when a scheduled assessment window opens and becomes ready for candidate launch.
+- **Examination Deadline Reminders:** Automated reminders dispatched ahead of approaching assessment deadlines or test window closures to prevent missed tests.
+- **Schedule Updates & Cancellations:** Sent if an administrator reschedules or cancels an assessment.
+
+All notifications use a clean, mobile-responsive HTML layout with an accessible plain-text alternative.
+
 ---
 
 ## 4. Candidate Dashboard & Assigned Tests

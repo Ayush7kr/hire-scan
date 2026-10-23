@@ -96,18 +96,18 @@
                 <th>Assessment</th>
                 <th>Topic</th>
                 <th>Difficulty</th>
-                <th class="text-center">Assigned Appearances</th>
+                <th class="text-center">Assigned</th>
                 <th class="text-center">Correct</th>
                 <th class="text-center">Incorrect</th>
-                <th class="text-center">Unanswered</th>
-                <th class="text-center">Accuracy Rate</th>
+                <th class="text-center">Accuracy (Facility P)</th>
+                <th class="text-center">Discrimination (D)</th>
                 <th class="pe-3 text-center">Item Evaluation</th>
               </tr>
             </thead>
             <tbody>
               {% for row in page_obj %}
                 <tr>
-                  <td class="ps-3" style="max-width: 280px;">
+                  <td class="ps-3" style="max-width: 260px;">
                     <div class="fw-semibold text-dark text-truncate" title="{{ row.question.question_text }}">
                       {{ row.question.question_text }}
                     </div>
@@ -119,13 +119,16 @@
                   <td class="text-center font-mono fw-bold">{{ row.assigned_count }}</td>
                   <td class="text-center font-mono text-success fw-bold">{{ row.correct_count }}</td>
                   <td class="text-center font-mono text-danger">{{ row.incorrect_count }}</td>
-                  <td class="text-center font-mono text-muted">{{ row.unanswered_count }}</td>
                   <td class="text-center font-mono fw-bold">
                     {% if row.has_data %}
-                      {{ row.accuracy }}%
+                      <div>{{ row.accuracy }}%</div>
+                      <div class="small text-muted font-mono" style="font-size: 0.72rem;">P = {{ row.facility_display }}</div>
                     {% else %}
                       <span class="text-muted">—</span>
                     {% endif %}
+                  </td>
+                  <td class="text-center small font-mono">
+                    {{ row.discrimination_display }}
                   </td>
                   <td class="pe-3 text-center">
                     <span class="badge {{ row.badge_class }}">

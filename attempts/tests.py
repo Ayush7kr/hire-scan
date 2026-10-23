@@ -574,3 +574,136 @@ class TestStatusCandidateGatingTests(AssessmentEngineBaseTestCase):
         self.assertFalse(can_start)
         self.assertIn("ended", reason.lower())
 
+
+class AssessmentIntegrityAndAuditTests(AssessmentEngineBaseTestCase):
+    """Test suite for mentor-requested audit log enhancements and assessment integrity protections."""
+
+    def setUp(self):
+        super().setUp()
+        self.attempt = start_attempt_for_registration(self.registration)
+
+    def test_unauthorized_access_to_instructions_and_take_logged_in_audit(self):
+        """When an unauthorized candidate attempts to access another candidate's registration/attempt, 403 is returned and logged."""
+        # Bob tries to access Alice's instructions
+        res1 = self.bob_client.get(reverse('test_instructions', args=[self.registration.registration_id]))
+        self.assertEqual(res1.status_code, 403)
+
+        # Bob tries to access Alice's test_take
+        res2 = self.bob_client.get(reverse('test_take', args=[self.attempt.attempt_id]))
+        self.assertEqual(res2.status_code, 403)
+
+        # Bob tries to autosave to Alice's attempt
+        res3 = self.bob_client.post(
+            reverse('test_autosave', args=[self.attempt.attempt_id]),
+            data='{"question_order": 1, "selected_option": 2}',
+            content_type='application/json'
+        )
+        self.assertEqual(res3.status_code, 403)
+
+        # Check ActivityLog for unauthorized access attempts
+        logs = ActivityLog.objects.filter(
+            candidate=self.candidate2,
+            activity_type='unauthorized_access_attempt'
+        )
+        self.assertGreaterEqual(logs.count(), 3)
+
+    def test_cancelled_test_guards_active_attempts(self):
+        """If a test is cancelled while an attempt is in-progress, test_take and autosave reject continuation."""
+        self.test.is_cancelled = True
+        self.test.save()
+
+        # test_take redirects with warning
+        res_take = self.alice_client.get(reverse('test_take', args=[self.attempt.attempt_id]))
+        self.assertEqual(res_take.status_code, 302)
+        self.assertRedirects(res_take, reverse('candidate_dashboard'))
+
+        # autosave returns 400 error
+        res_save = self.alice_client.post(
+            reverse('test_autosave', args=[self.attempt.attempt_id]),
+            data='{"question_order": 1, "selected_option": 1}',
+            content_type='application/json'
+        )
+        self.assertEqual(res_save.status_code, 400)
+        self.assertIn("cancelled", res_save.json().get('error', '').lower())
+
+    def test_scorecard_pdf_download_logs_audit_trail(self):
+        """Downloading official scorecard PDF creates a scorecard_downloaded_pdf ActivityLog record."""
+        # Finalize attempt first
+        evaluate_attempt(self.attempt, submission_reason='manual')
+
+        # Alice downloads scorecard PDF
+        res = self.alice_client.get(reverse('attempt_scorecard_pdf', args=[self.attempt.attempt_id]))
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res['Content-Type'], 'application/pdf')
+
+        # Verify audit log
+        log = ActivityLog.objects.filter(
+            candidate=self.candidate1,
+            attempt=self.attempt,
+            activity_type='scorecard_downloaded_pdf'
+        ).first()
+        self.assertIsNotNone(log)
+        self.assertIn("Scorecard PDF downloaded", log.activity_details)
+
+    def test_csv_export_operations_logged_in_audit_trail(self):
+        """Admin CSV exports create report_exported_csv audit log entries."""
+        # Export completion pipeline
+        res1 = self.admin_client.get(reverse('analytics_export_completion'))
+        self.assertEqual(res1.status_code, 200)
+
+        # Export test summary
+        res2 = self.admin_client.get(reverse('analytics_export_tests'))
+        self.assertEqual(res2.status_code, 200)
+
+        export_logs = ActivityLog.objects.filter(
+            admin=self.admin,
+            activity_type='report_exported_csv'
+        )
+        self.assertEqual(export_logs.count(), 2)
+
+    def test_question_crud_operations_logged_in_audit_trail(self):
+        """Admin creating, editing, and deleting questions produces distinct audit log records."""
+        # Create question
+        res_create = self.admin_client.post(
+            reverse('question_create', args=[self.test.test_id]),
+            {
+                'question_text': 'What is ACID in database design?',
+                'option1': 'Atomicity, Consistency, Isolation, Durability',
+                'option2': 'Availability, Coherence, Integrity, Distribution',
+                'option3': 'Access, Control, Identification, Delegation',
+                'option4': 'Application, Component, Interface, Data',
+                'correct_option': '1',
+                'topic': 'Databases',
+                'difficulty': 'medium',
+                'suggestions': 'Review database transaction principles.'
+            }
+        )
+        self.assertEqual(res_create.status_code, 302)
+        q = Question.objects.get(question_text='What is ACID in database design?')
+        self.assertTrue(ActivityLog.objects.filter(admin=self.admin, activity_type='question_created').exists())
+
+        # Edit question
+        res_edit = self.admin_client.post(
+            reverse('question_edit', args=[self.test.test_id, q.question_id]),
+            {
+                'question_text': 'What is ACID in relational database management?',
+                'option1': 'Atomicity, Consistency, Isolation, Durability',
+                'option2': 'Availability, Coherence, Integrity, Distribution',
+                'option3': 'Access, Control, Identification, Delegation',
+                'option4': 'Application, Component, Interface, Data',
+                'correct_option': '1',
+                'topic': 'Databases',
+                'difficulty': 'hard',
+                'suggestions': 'Review transaction isolation levels.'
+            }
+        )
+        self.assertEqual(res_edit.status_code, 302)
+        self.assertTrue(ActivityLog.objects.filter(admin=self.admin, activity_type='question_updated').exists())
+
+        # Delete question
+        res_del = self.admin_client.post(
+            reverse('question_delete', args=[self.test.test_id, q.question_id])
+        )
+        self.assertEqual(res_del.status_code, 302)
+        self.assertTrue(ActivityLog.objects.filter(admin=self.admin, activity_type='question_deleted').exists())
+

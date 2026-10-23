@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ notification_title }} — HireScan</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #334155;
+      -webkit-font-smoothing: antialiased;
+    }
+    table {
+      border-spacing: 0;
+    }
+    td {
+      padding: 0;
+    }
+    img {
+      border: 0;
+    }
+    .wrapper {
+      width: 100%;
+      table-layout: fixed;
+      background-color: #f1f5f9;
+      padding: 30px 10px;
+    }
+    .main-card {
+      background-color: #ffffff;
+      margin: 0 auto;
+      max-width: 580px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+    .header {
+      background-color: #0b1329;
+      padding: 24px 32px;
+      text-align: center;
+    }
+    .header-title {
+      color: #ffffff;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin: 0;
+    }
+    .header-subtitle {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .content {
+      padding: 32px;
+    }
+    .greeting {
+      font-size: 16px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 12px;
+    }
+    .lead-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #475569;
+      margin-bottom: 24px;
+    }
+    .details-box {
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .details-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1e40af;
+      margin-bottom: 12px;
+    }
+    .detail-row {
+      margin-bottom: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #334155;
+    }
+    .detail-label {
+      font-weight: 600;
+      color: #64748b;
+      display: inline-block;
+      width: 140px;
+    }
+    .notice-box {
+      background-color: #eff6ff;
+      border-left: 4px solid #2563eb;
+      border-radius: 4px;
+      padding: 12px 16px;
+      margin: 24px 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #1e3a8a;
+    }
+    .notice-warning {
+      background-color: #fffbeb;
+      border-left-color: #f59e0b;
+      color: #92400e;
+    }
+    .notice-danger {
+      background-color: #fef2f2;
+      border-left-color: #ef4444;
+      color: #991b1b;
+    }
+    .notice-title {
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .cta-container {
+      text-align: center;
+      margin: 28px 0 16px 0;
+    }
+    .cta-button {
+      background-color: #2563eb;
+      color: #ffffff !important;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      padding: 12px 28px;
+      border-radius: 6px;
+      display: inline-block;
+    }
+    .footer {
+      background-color: #f8fafc;
+      padding: 20px 32px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <table role="presentation" width="100%">
+      <tr>
+        <td align="center">
+          <div class="main-card">
+            <!-- Header -->
+            <div class="header">
+              <h1 class="header-title">HireScan</h1>
+              <div class="header-subtitle">{{ notification_title }}</div>
+            </div>
+
+            <!-- Content -->
+            <div class="content">
+              <div class="greeting">Hello {{ candidate_name }},</div>
+              <p class="lead-text">
+                {{ lead_message }}
+              </p>
+
+              <!-- Assessment Details Box -->
+              <div class="details-box">
+                <div class="details-title">{{ test_name }}</div>
+                {% if description %}
+                <div class="detail-row" style="margin-bottom: 12px; color: #475569;">
+                  {{ description }}
+                </div>
+                {% endif %}
+                <div class="detail-row">
+                  <span class="detail-label">Duration:</span>
+                  <strong>{{ duration_minutes }} minutes</strong>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Total Questions:</span>
+                  <strong>{{ total_questions }} questions (MCQ)</strong>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Passing Marks:</span>
+                  <strong>{{ passing_marks }} / {{ total_questions }}</strong>
+                </div>
+                {% if start_time_str %}
+                <div class="detail-row">
+                  <span class="detail-label">Window Opens:</span>
+                  <span>{{ start_time_str }}</span>
+                </div>
+                {% endif %}
+                {% if end_time_str %}
+                <div class="detail-row">
+                  <span class="detail-label">Window Closes:</span>
+                  <span>{{ end_time_str }}</span>
+                </div>
+                {% endif %}
+                <div class="detail-row">
+                  <span class="detail-label">Current Status:</span>
+                  <span>{{ status_display }}</span>
+                </div>
+              </div>
+
+              <!-- Notice Box -->
+              {% if notice_text %}
+              <div class="notice-box {% if notice_type == 'warning' %}notice-warning{% elif notice_type == 'danger' %}notice-danger{% endif %}">
+                <div class="notice-title">{{ notice_title }}</div>
+                {{ notice_text }}
+              </div>
+              {% endif %}
+
+              <!-- CTA Button -->
+              {% if cta_url %}
+              <div class="cta-container">
+                <a href="{{ cta_url }}" class="cta-button">{{ cta_text }}</a>
+              </div>
+              {% endif %}
+
+              <p class="lead-text" style="font-size: 13px; color: #64748b; margin-top: 24px; margin-bottom: 0;">
+                To access your assessment, log in to the Candidate Portal using your registered email address and passwordless one-time verification code (OTP).
+              </p>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+              <div>&copy; 2026 HireScan Test Management Tool. All rights reserved.</div>
+              <div style="margin-top: 4px;">Secure Session Authentication &bull; Role-Based Access Control</div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>

@@ -1,11 +1,13 @@
 import io
 from datetime import timedelta
+from django.core import mail
+from django.core.management import call_command
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import Admin, Candidate, ActivityLog
-from assessments.models import Test, Question, TestRegistration
+from assessments.models import Test, Question, TestRegistration, NotificationLog
 from attempts.models import TestAttempt
 
 
@@ -600,4 +602,243 @@ class SearchAndFilterTests(TestCase):
         self.assertIn('query_string', res.context)
         self.assertIn('q=Alice', res.context['query_string'])
         self.assertIn('status=registered', res.context['query_string'])
+
+
+class BulkRegistrationSummaryTests(TestCase):
+    """Test suite for mentor-requested bulk registration summary reporting and session handling."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = Admin(name="Summary Admin", email="summary.admin@test.local")
+        self.admin.set_password("AdminPass123!")
+        self.admin.save()
+        self.client.post(reverse('admin_login'), {
+            'email': 'summary.admin@test.local',
+            'password': 'AdminPass123!'
+        })
+
+        self.test = Test.objects.create(
+            test_name="Bulk Summary Assessment",
+            duration_minutes=45,
+            total_questions=10,
+            passing_marks=6,
+            is_active=True
+        )
+
+        self.cand_new = Candidate.objects.create(name="New Candidate", email="new.cand@test.local", is_active=True)
+        self.cand_existing = Candidate.objects.create(name="Existing Candidate", email="existing.cand@test.local", is_active=True)
+        self.cand_inactive = Candidate.objects.create(name="Disabled Candidate", email="disabled.cand@test.local", is_active=False)
+
+        # Pre-register cand_existing
+        TestRegistration.objects.create(test=self.test, candidate=self.cand_existing, status='registered')
+
+    def test_direct_access_without_session_redirects_to_registration_list(self):
+        """Visiting the summary endpoint without an active session summary redirects to registration list."""
+        response = self.client.get(reverse('registration_bulk_summary'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('registration_list'), response.url)
+
+    def test_bulk_registration_redirects_to_summary_and_renders_breakdown(self):
+        """Bulk registration populates session and renders summary with success, duplicate, and rejected breakdowns."""
+        response = self.client.post(reverse('registration_create'), {
+            'mode': 'multiple',
+            'test_id': str(self.test.test_id),
+            'candidate_ids': [
+                str(self.cand_new.candidate_id),
+                str(self.cand_existing.candidate_id),
+                str(self.cand_inactive.candidate_id)
+            ]
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('registration_bulk_summary'))
+
+        # Follow redirect to summary page
+        summary_response = self.client.get(reverse('registration_bulk_summary'))
+        self.assertEqual(summary_response.status_code, 200)
+
+        # Check KPI metrics
+        summary = summary_response.context['summary']
+        self.assertEqual(summary['total_selected'], 3)
+        self.assertEqual(summary['created_count'], 1)
+        self.assertEqual(summary['already_registered_count'], 1)
+        self.assertEqual(summary['rejected_count'], 1)
+
+        # Check candidate attribution in tables
+        content = summary_response.content.decode('utf-8')
+        self.assertIn('New Candidate', content)
+        self.assertIn('Existing Candidate', content)
+        self.assertIn('Disabled Candidate', content)
+        self.assertIn('Candidate is inactive', content)
+
+        # Refreshing the summary page keeps the report visible for printing or review
+        repeat_response = self.client.get(reverse('registration_bulk_summary'))
+        self.assertEqual(repeat_response.status_code, 200)
+
+        # When session key is cleared, direct access redirects to list
+        session = self.client.session
+        del session['bulk_registration_summary']
+        session.save()
+        subsequent_response = self.client.get(reverse('registration_bulk_summary'))
+        self.assertEqual(subsequent_response.status_code, 302)
+        self.assertIn(reverse('registration_list'), subsequent_response.url)
+
+
+class AssessmentNotificationTests(TestCase):
+    """Test suite for assessment email notifications, anti-duplication, and reminders."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = Admin(name="Notification Admin", email="notify.admin@test.local")
+        self.admin.set_password("AdminPass123!")
+        self.admin.save()
+        self.client.post(reverse('admin_login'), {
+            'email': 'notify.admin@test.local',
+            'password': 'AdminPass123!'
+        })
+
+        self.candidate = Candidate.objects.create(
+            name="Notified Candidate",
+            email="candidate.notify@test.local",
+            is_active=True
+        )
+        self.test = Test.objects.create(
+            test_name="Notification Verification Test",
+            duration_minutes=30,
+            total_questions=5,
+            passing_marks=3,
+            is_active=True
+        )
+
+    def test_single_registration_dispatches_email_and_logs(self):
+        """Registering a candidate sends an email and logs to NotificationLog."""
+        mail.outbox.clear()
+
+        response = self.client.post(reverse('registration_create'), {
+            'candidate_id': str(self.candidate.candidate_id),
+            'test_id': str(self.test.test_id)
+        })
+        self.assertEqual(response.status_code, 302)
+
+        # Verify email sent
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertIn("Notification Verification Test", email.subject)
+        self.assertIn("Notified Candidate", email.body)
+        self.assertEqual(email.to, ["candidate.notify@test.local"])
+
+        # Verify NotificationLog entry
+        log_entry = NotificationLog.objects.filter(
+            candidate=self.candidate,
+            test=self.test,
+            notification_type='registered'
+        ).first()
+        self.assertIsNotNone(log_entry)
+        self.assertEqual(log_entry.status, 'sent')
+
+    def test_registration_notification_prevents_duplicate_sends(self):
+        """Retrying or invoking notification helper again prevents sending duplicate email."""
+        from assessments.notifications import send_registration_notification
+
+        TestRegistration.objects.create(candidate=self.candidate, test=self.test, status='registered')
+        mail.outbox.clear()
+
+        # First call: succeeds and sends email
+        success1, msg1 = send_registration_notification(self.candidate, self.test)
+        self.assertTrue(success1)
+        self.assertEqual(len(mail.outbox), 1)
+
+        # Second call: detected as duplicate, sends no new email
+        success2, msg2 = send_registration_notification(self.candidate, self.test)
+        self.assertIn("already delivered", msg2)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_test_activation_dispatches_available_notification(self):
+        """Activating an inactive test with registered candidates sends 'available' notification."""
+        test_inactive = Test.objects.create(
+            test_name="Pending Activation Test",
+            duration_minutes=30,
+            total_questions=2,
+            passing_marks=1,
+            is_active=False
+        )
+        for i in range(2):
+            Question.objects.create(
+                test=test_inactive,
+                question_text=f"Q{i}",
+                option1="1", option2="2", option3="3", option4="4",
+                correct_option=1, topic="T"
+            )
+        TestRegistration.objects.create(candidate=self.candidate, test=test_inactive, status='registered')
+
+        mail.outbox.clear()
+        res = self.client.post(reverse('test_toggle_status', kwargs={'test_id': test_inactive.test_id}))
+        self.assertEqual(res.status_code, 302)
+
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertIn("Pending Activation Test", email.subject)
+        self.assertIn("now Open", email.subject)
+
+        # Check log
+        self.assertTrue(NotificationLog.objects.filter(
+            candidate=self.candidate,
+            test=test_inactive,
+            notification_type='available',
+            status='sent'
+        ).exists())
+
+    def test_test_cancellation_dispatches_cancelled_notification(self):
+        """Cancelling a test sends 'cancelled' notification to registered candidates."""
+        TestRegistration.objects.create(candidate=self.candidate, test=self.test, status='registered')
+        mail.outbox.clear()
+
+        res = self.client.post(reverse('test_toggle_cancel', kwargs={'test_id': self.test.test_id}))
+        self.assertEqual(res.status_code, 302)
+
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertIn("Notification Verification Test", email.subject)
+        self.assertIn("Cancelled", email.subject)
+
+        self.assertTrue(NotificationLog.objects.filter(
+            candidate=self.candidate,
+            test=self.test,
+            notification_type='cancelled',
+            status='sent'
+        ).exists())
+
+    def test_send_assessment_reminders_command(self):
+        """send_assessment_reminders command alerts candidates with upcoming scheduled tests."""
+        now = timezone.now()
+        upcoming_test = Test.objects.create(
+            test_name="Upcoming Timed Exam",
+            duration_minutes=60,
+            total_questions=10,
+            passing_marks=6,
+            start_time=now + timedelta(hours=3),
+            end_time=now + timedelta(hours=6),
+            is_active=True
+        )
+        TestRegistration.objects.create(candidate=self.candidate, test=upcoming_test, status='registered')
+
+        mail.outbox.clear()
+
+        # Run command with hours=5
+        call_command('send_assessment_reminders', hours=5)
+
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertIn("Reminder", email.subject)
+        self.assertIn("Upcoming Timed Exam", email.subject)
+
+        self.assertTrue(NotificationLog.objects.filter(
+            candidate=self.candidate,
+            test=upcoming_test,
+            notification_type='reminder',
+            status='sent'
+        ).exists())
+
+        # Second run should send 0 emails due to deduplication
+        call_command('send_assessment_reminders', hours=5)
+        self.assertEqual(len(mail.outbox), 1)
 

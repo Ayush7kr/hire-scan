@@ -403,6 +403,12 @@ def export_test_summary_csv(request, test_id=None):
             sanitize_csv_cell(item['avg_time_formatted']),
         ])
 
+    ActivityLog.objects.create(
+        admin=request.admin_user,
+        activity_type='report_exported_csv',
+        activity_details=f"Admin exported Test Summary CSV report ({filename})."
+    )
+
     return response
 
 
@@ -487,6 +493,12 @@ def export_candidates_csv(request):
             sanitize_csv_cell(att.end_time.strftime("%Y-%m-%d %H:%M:%S") if att.end_time else '—'),
         ])
 
+    ActivityLog.objects.create(
+        admin=request.admin_user,
+        activity_type='report_exported_csv',
+        activity_details=f"Admin exported Candidate Performance CSV report ({attempts_qs.count()} rows)."
+    )
+
     return response
 
 
@@ -522,6 +534,12 @@ def export_questions_csv(request):
             sanitize_csv_cell(item['diff_level']),
         ])
 
+    ActivityLog.objects.create(
+        admin=request.admin_user,
+        activity_type='report_exported_csv',
+        activity_details=f"Admin exported Question Analysis CSV report ({len(question_data)} questions)."
+    )
+
     return response
 
 
@@ -554,6 +572,12 @@ def export_topics_csv(request):
             sanitize_csv_cell(item['level']),
             sanitize_csv_cell(suggestions_str),
         ])
+
+    ActivityLog.objects.create(
+        admin=request.admin_user,
+        activity_type='report_exported_csv',
+        activity_details=f"Admin exported Topic Performance CSV report ({len(topic_data)} topics)."
+    )
 
     return response
 
@@ -621,4 +645,80 @@ def export_completion_csv(request):
             sanitize_csv_cell(outcome),
         ])
 
+    ActivityLog.objects.create(
+        admin=request.admin_user,
+        activity_type='report_exported_csv',
+        activity_details=f"Admin exported Completion Pipeline CSV report ({regs_qs.count()} registrations)."
+    )
+
+    return response
+
+
+@admin_required
+def export_test_summary_pdf(request, test_id):
+    """
+    Download official executive assessment summary report in PDF format.
+    Restricted to authorized administrators.
+    """
+    import re
+    from assessments.models import Test
+    from analytics.pdf_export import generate_assessment_summary_pdf
+
+    test = get_object_or_404(Test, test_id=test_id)
+    pdf_bytes = generate_assessment_summary_pdf(test.test_id)
+
+    ActivityLog.objects.create(
+        admin=request.admin_user,
+        activity_type='report_exported_pdf',
+        activity_details=f"Admin exported Assessment Summary PDF report for '{test.test_name}'."
+    )
+
+    safe_title = re.sub(r'[^a-zA-Z0-9_-]', '_', test.test_name)[:30]
+    filename = f"HireScan_Assessment_Summary_{safe_title}.pdf"
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@admin_required
+def export_candidate_results_pdf(request):
+    """
+    Download official examinee assessment results and cohort outcomes in PDF format.
+    Respects active search, assessment selection, outcome, and date filters.
+    Restricted to authorized administrators.
+    """
+    import re
+    from assessments.models import Test
+    from analytics.pdf_export import generate_candidate_results_pdf
+
+    test_id = request.GET.get('test_id', '').strip()
+    filters = {
+        'q': request.GET.get('q', '').strip(),
+        'status': request.GET.get('status', '').strip(),
+        'outcome': request.GET.get('outcome', '').strip(),
+        'date_from': request.GET.get('date_from', '').strip(),
+        'date_to': request.GET.get('date_to', '').strip(),
+    }
+
+    test_obj = None
+    if test_id:
+        test_obj = get_object_or_404(Test, test_id=test_id)
+
+    pdf_bytes = generate_candidate_results_pdf(test_id=test_id or None, filters=filters)
+
+    ActivityLog.objects.create(
+        admin=request.admin_user,
+        activity_type='report_exported_pdf',
+        activity_details="Admin exported Examinee Assessment Results PDF report."
+    )
+
+    if test_obj:
+        safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', test_obj.test_name)[:25]
+        filename = f"HireScan_Examinees_{safe_name}.pdf"
+    else:
+        filename = "HireScan_All_Examinees_Results.pdf"
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response

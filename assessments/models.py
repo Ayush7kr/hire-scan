@@ -189,3 +189,48 @@ class TestRegistration(models.Model):
 
     def __str__(self):
         return f"{self.candidate.name} → {self.test.test_name}"
+
+
+class NotificationLog(models.Model):
+    """
+    Log of email notifications and reminders dispatched to candidates.
+    Prevents duplicate dispatches and provides auditability for delivery attempts.
+    """
+    TYPE_CHOICES = [
+        ('registered', 'Registration Confirmation'),
+        ('available', 'Assessment Available'),
+        ('reminder', 'Upcoming Assessment Reminder'),
+        ('schedule_updated', 'Schedule Updated'),
+        ('cancelled', 'Assessment Cancelled'),
+    ]
+    STATUS_CHOICES = [
+        ('sent', 'Sent'),
+        ('failed', 'Failed'),
+    ]
+
+    notification_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    candidate = models.ForeignKey(
+        Candidate, on_delete=models.CASCADE, related_name='assessment_notifications'
+    )
+    test = models.ForeignKey(
+        Test, on_delete=models.CASCADE, related_name='notifications'
+    )
+    notification_type = models.CharField(max_length=50, choices=TYPE_CHOICES)
+    recipient_email = models.EmailField(max_length=255)
+    subject = models.CharField(max_length=255)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='sent')
+    error_message = models.TextField(blank=True, default='')
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'notification_log'
+        indexes = [
+            models.Index(fields=['candidate', 'test', 'notification_type'], name='idx_notif_cand_test_type'),
+            models.Index(fields=['sent_at'], name='idx_notif_sent_at'),
+            models.Index(fields=['status'], name='idx_notif_status'),
+        ]
+        ordering = ['-sent_at']
+
+    def __str__(self):
+        return f"{self.notification_type} to {self.recipient_email} for {self.test.test_name} ({self.status})"
+

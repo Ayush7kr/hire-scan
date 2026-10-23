@@ -5,7 +5,7 @@
 [![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white)](https://getbootstrap.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-153%20Passed%20(100%25)-success?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/Ayush7kr/hire-scan)
+[![Tests](https://img.shields.io/badge/Tests-176%20Passed%20(100%25)-success?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/Ayush7kr/hire-scan)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 HireScan is a secure, high-performance, enterprise-grade technical assessment and test management tool. Engineered with Django and Python, HireScan automates candidate onboarding, conducts timed, randomized examinations with zero answer leakage, and delivers executive psychometric and competency analytics.
@@ -143,7 +143,35 @@ Dive deeper into every facet of HireScan with our dedicated guides:
   - Multi-stage `Dockerfile` running as non-root user (`hirescan`).
   - `docker-compose.yml` orchestrating PostgreSQL 16 and Gunicorn WSGI.
   - Automated health check probes (`/health/`, `/healthz/`).
-  - GitHub Actions CI workflow executing linting, PostgreSQL migrations, and 153 automated tests.
+  - GitHub Actions CI workflow executing linting, PostgreSQL migrations, and 176 automated tests.
+
+---
+
+## 🚀 Mentor-Approved Platform Enhancements
+
+HireScan features six major institutional enhancements:
+
+1. **Email Notifications & Automated Reminders:**
+   - Branded HTML notifications with plain-text fallback for enrollment, test availability, and cancellations.
+   - Background automated examination reminders via `python manage.py send_assessment_reminders --hours=24`.
+   - Idempotent `NotificationLog` tracking preventing duplicate dispatches.
+2. **Bulk Registration Summary Screen:**
+   - Post-registration summary screen with KPIs (Total Selected, Created, Already Registered, Rejected/Invalid).
+   - Detailed candidate breakdown tables specifying exact conflict or validation reasons.
+3. **Comprehensive Audit Logging & Stream UI:**
+   - Granular event capture for question authoring, CSV/PDF exports, examinee lifecycle, and unauthorized attempts.
+   - Categorized badges (Security, Examination, Authoring, Reporting) with actor attribution in an independently scrollable feed.
+4. **Advanced Assessment Analytics & Psychometrics:**
+   - Item-level Facility Index ($P$) and Discrimination Index ($D$) psychometrics.
+   - Statistical distribution metrics: median score, score range, standard deviation, and score quadrant brackets.
+   - Candidate cross-assessment competency profiling tracking score history, timelines, and demonstrated topic strengths vs. focus areas.
+5. **Assessment Integrity & Tamper-Evident Defenses:**
+   - Server-authoritative timer enforcement preventing client clock tampering.
+   - Mid-flight cancellation guards immediately halting autosaving or submissions on revoked tests.
+   - Strict session and IDOR defense with activity logging for unauthorized probes.
+6. **Automated Executive Report Generation:**
+   - Assessment Summary ReportLab PDF exports with institutional KPIs, statistical distributions, score brackets, topic breakdowns, and uniform 2-line security footers.
+   - Filter-scoped Candidate Results PDF exports for executive review and spreadsheet correlation.
 
 ---
 

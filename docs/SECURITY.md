@@ -69,6 +69,8 @@ Access to examination instructions and question pools is protected by multi-laye
 
 - **Schedule Window Enforcement:** Access is strictly bounded by `start_time` and `end_time`. Attempting to access an assessment before `start_time` (Upcoming) or after `end_time` (Expired) is blocked on the server, irrespective of client time settings.
 - **Immediate Cancellation Lock:** Tests marked `is_cancelled=True` immediately revoke candidate access to instructions and prevent attempt initialization.
+- **Mid-Flight Cancellation Guard:** If an assessment is cancelled or deactivated while a candidate is actively testing, subsequent question autosaves and submission requests are instantly rejected on the server.
+- **Strict Authorization & IDOR Defense:** Direct URL manipulation cannot access another candidate's assessment attempt, autosave payload, or PDF scorecard. Every request checks session credentials against registration ownership, logging `unauthorized_access_attempt` events upon violations.
 - **Sufficiency Gate:** An active test cannot be started unless the test question bank contains at least `total_questions`.
 - **Atomic Bulk Registrations:** Bulk candidate registrations are executed within atomic database transactions, preventing partial assignments and handling race conditions.
 
@@ -138,9 +140,9 @@ In production mode (`DJANGO_PRODUCTION=True`), HireScan enables comprehensive HT
 
 Every sensitive administrative action is logged to the `ActivityLog` table (`accounts/models.py`), recording:
 
-- **Actor Type:** `admin` or `system`.
-- **Actor ID:** Unique UUID of the administrator.
-- **Action Type:** `admin_login`, `candidate_import`, `test_create`, `test_toggle_status`, `candidate_evaluated`, etc.
+- **Actor Type:** `admin`, `candidate`, or `system`.
+- **Actor ID:** Unique UUID of the actor.
+- **Action Type:** `admin_login`, `candidate_import`, `test_create`, `test_toggle_status`, `candidate_evaluated`, `question_created`, `question_updated`, `question_deleted`, `bulk_candidates_registered`, `report_exported_csv`, `report_exported_pdf`, `unauthorized_access_attempt`.
 - **IP Address & User-Agent:** Client network address and browser fingerprint.
 - **Timestamp:** High-precision UTC timestamp.
 

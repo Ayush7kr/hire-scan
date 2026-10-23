@@ -344,6 +344,41 @@ def get_test_summary_analytics(test_id=None, filters=None):
 
         bank_count = Question.objects.filter(test=test).count()
 
+        # Statistical distribution calculations
+        scores_list = [a.score for a in finalized if a.score is not None]
+        scores_list.sort()
+        if scores_list:
+            n_scores = len(scores_list)
+            mid = n_scores // 2
+            if n_scores % 2 == 1:
+                median_score = float(scores_list[mid])
+            else:
+                median_score = round(float((scores_list[mid - 1] + scores_list[mid]) / 2), 1)
+            score_range = max_score - min_score
+            if n_scores >= 2:
+                mean_s = sum(scores_list) / n_scores
+                var_s = sum((x - mean_s) ** 2 for x in scores_list) / (n_scores - 1)
+                std_dev = round(var_s ** 0.5, 2)
+            else:
+                std_dev = 0.0
+        else:
+            median_score = 0.0
+            score_range = 0
+            std_dev = 0.0
+
+        # Score percentage distribution buckets
+        b_above_90 = finalized.filter(percentage__gte=90.0).count()
+        b_75_89 = finalized.filter(percentage__gte=75.0, percentage__lt=90.0).count()
+        b_50_74 = finalized.filter(percentage__gte=50.0, percentage__lt=75.0).count()
+        b_below_50 = finalized.filter(percentage__lt=50.0).count()
+
+        distribution_buckets = [
+            {'label': 'Excellent (90–100%)', 'count': b_above_90, 'pct': round((b_above_90 / finalized_count) * 100, 1) if finalized_count > 0 else 0.0, 'color': 'success'},
+            {'label': 'Proficient (75–89%)', 'count': b_75_89, 'pct': round((b_75_89 / finalized_count) * 100, 1) if finalized_count > 0 else 0.0, 'color': 'primary'},
+            {'label': 'Average (50–74%)', 'count': b_50_74, 'pct': round((b_50_74 / finalized_count) * 100, 1) if finalized_count > 0 else 0.0, 'color': 'warning'},
+            {'label': 'Below Standard (<50%)', 'count': b_below_50, 'pct': round((b_below_50 / finalized_count) * 100, 1) if finalized_count > 0 else 0.0, 'color': 'danger'},
+        ]
+
         summaries.append({
             'test': test,
             'total_registered': total_reg,
@@ -357,6 +392,9 @@ def get_test_summary_analytics(test_id=None, filters=None):
             'failed': failed,
             'pass_rate': pass_rate,
             'avg_score': avg_score,
+            'median_score': median_score,
+            'score_range': score_range,
+            'std_dev_score': std_dev,
             'min_score': min_score,
             'max_score': max_score,
             'avg_percentage': avg_pct,
@@ -364,6 +402,8 @@ def get_test_summary_analytics(test_id=None, filters=None):
             'avg_time_formatted': avg_time_formatted,
             'bank_count': bank_count,
             'is_sufficient': bank_count >= test.total_questions,
+            'distribution_buckets': distribution_buckets,
+            'topic_breakdown': get_topic_analytics(test_id=test.test_id),
         })
 
     if test_id:
@@ -401,8 +441,32 @@ def get_question_analysis_analytics(test_id=None):
 
         if assigned_count > 0:
             accuracy = round((correct_count / assigned_count) * 100, 1)
+            facility_index = round(correct_count / assigned_count, 2)
         else:
             accuracy = None
+            facility_index = None
+
+        # Discrimination Index: compare top group vs bottom group of finalized attempts
+        discrimination_index = None
+        discrimination_display = "— (Cohort < 4)"
+        if assigned_count >= 4:
+            ranked_aq = list(aq_qs.select_related('attempt').order_by('-attempt__score'))
+            group_size = max(1, int(round(len(ranked_aq) * 0.27))) if len(ranked_aq) >= 8 else max(1, len(ranked_aq) // 2)
+            upper_group = ranked_aq[:group_size]
+            lower_group = ranked_aq[-group_size:]
+
+            p_upper = sum(1 for a in upper_group if a.is_correct) / len(upper_group)
+            p_lower = sum(1 for a in lower_group if a.is_correct) / len(lower_group)
+            d_val = round(p_upper - p_lower, 2)
+            discrimination_index = d_val
+            if d_val >= 0.40:
+                discrimination_display = f"{d_val:+.2f} (Excellent)"
+            elif d_val >= 0.20:
+                discrimination_display = f"{d_val:+.2f} (Good)"
+            elif d_val >= 0.0:
+                discrimination_display = f"{d_val:+.2f} (Fair)"
+            else:
+                discrimination_display = f"{d_val:+.2f} (Review)"
 
         # Difficulty index interpretation
         if assigned_count == 0:
@@ -425,6 +489,10 @@ def get_question_analysis_analytics(test_id=None):
             'incorrect_count': incorrect_count,
             'unanswered_count': unanswered_count,
             'accuracy': accuracy if accuracy is not None else 0.0,
+            'facility_index': facility_index,
+            'facility_display': f"{facility_index:.2f}" if facility_index is not None else "—",
+            'discrimination_index': discrimination_index,
+            'discrimination_display': discrimination_display,
             'has_data': assigned_count > 0,
             'diff_level': diff_level,
             'badge_class': badge_class,
@@ -588,4 +656,99 @@ def get_completion_analytics(test_id=None, filters=None):
         'start_signals': start_signals,
         'submit_signals': submit_signals,
         'timeout_signals': timeout_signals,
+    }
+
+
+def get_candidate_cross_assessment_analytics(candidate_id):
+    """
+    Computes cross-assessment score comparisons, cumulative attempts, pass rate,
+    performance trends over time, and topic-level strengths/weaknesses across all
+    completed tests for a candidate.
+    """
+    candidate = Candidate.objects.filter(candidate_id=candidate_id).first()
+    if not candidate:
+        return None
+
+    registrations = TestRegistration.objects.filter(
+        candidate=candidate
+    ).select_related('test').prefetch_related('attempt').order_by('registered_at')
+
+    finalized_attempts = TestAttempt.objects.filter(
+        registration__candidate=candidate,
+        status__in=['completed', 'expired']
+    ).select_related('registration__test').order_by('start_time')
+
+    total_assigned = registrations.count()
+    completed_count = finalized_attempts.count()
+    passed_count = finalized_attempts.filter(is_passed=True).count()
+    failed_count = finalized_attempts.filter(is_passed=False).count()
+    pass_rate = round((passed_count / completed_count) * 100, 1) if completed_count > 0 else 0.0
+
+    avg_pct_agg = finalized_attempts.aggregate(Avg('percentage'))['percentage__avg']
+    avg_percentage = round(avg_pct_agg, 1) if avg_pct_agg is not None else 0.0
+
+    # Cross-assessment comparison items & trend
+    assessment_history = []
+    trend_labels = []
+    trend_percentages = []
+    for att in finalized_attempts:
+        test = att.registration.test
+        sec = att.time_taken_seconds or 0
+        m, s = divmod(sec, 60)
+        time_str = f"{m}m {s}s" if m > 0 else f"{s}s"
+        assessment_history.append({
+            'attempt_id': str(att.attempt_id),
+            'test_id': str(test.test_id),
+            'test_name': test.test_name,
+            'completed_date': att.end_time or att.start_time,
+            'score': att.score,
+            'total_questions': att.total_questions,
+            'percentage': float(att.percentage or Decimal('0.00')),
+            'is_passed': att.is_passed,
+            'time_taken_formatted': time_str,
+            'status': att.status,
+        })
+        trend_labels.append(test.test_name[:15])
+        trend_percentages.append(float(att.percentage or Decimal('0.00')))
+
+    # Aggregate topic strengths & weaknesses across all attempts
+    aq_qs = AttemptQuestion.objects.filter(
+        attempt__in=finalized_attempts
+    ).select_related('question')
+
+    topic_stats = {}
+    for aq in aq_qs:
+        t_name = aq.question.topic or 'General'
+        if t_name not in topic_stats:
+            topic_stats[t_name] = {'topic': t_name, 'correct': 0, 'total': 0}
+        topic_stats[t_name]['total'] += 1
+        if aq.is_correct:
+            topic_stats[t_name]['correct'] += 1
+
+    topic_strengths = []
+    topic_weaknesses = []
+    for t_data in topic_stats.values():
+        acc = round((t_data['correct'] / t_data['total']) * 100, 1) if t_data['total'] > 0 else 0.0
+        item = {'topic': t_data['topic'], 'accuracy': acc, 'total': t_data['total']}
+        if acc >= 75.0:
+            topic_strengths.append(item)
+        elif acc < 50.0:
+            topic_weaknesses.append(item)
+
+    topic_strengths.sort(key=lambda x: -x['accuracy'])
+    topic_weaknesses.sort(key=lambda x: x['accuracy'])
+
+    return {
+        'candidate': candidate,
+        'total_assigned': total_assigned,
+        'completed_count': completed_count,
+        'passed_count': passed_count,
+        'failed_count': failed_count,
+        'pass_rate': pass_rate,
+        'avg_percentage': avg_percentage,
+        'assessment_history': assessment_history,
+        'trend_labels': trend_labels,
+        'trend_percentages': trend_percentages,
+        'topic_strengths': topic_strengths,
+        'topic_weaknesses': topic_weaknesses,
     }

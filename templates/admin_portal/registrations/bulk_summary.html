@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Bulk Registration Summary — HireScan Admin{% endblock %}
+
+{% block navbar %}
+{% include 'admin_portal/includes/navbar.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex admin-layout-wrapper">
+  <!-- Sidebar -->
+  {% include 'admin_portal/includes/sidebar.html' with active_nav='registrations' %}
+
+  <!-- Main Content -->
+  <main class="admin-content">
+    <div class="container-fluid px-0">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb small mb-2">
+          <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'registration_list' %}" class="text-decoration-none">Registrations</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Bulk Registration Summary</li>
+        </ol>
+      </nav>
+
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-4">
+        <div>
+          <h4 class="fw-bold mb-1">
+            <i class="bi bi-clipboard-check text-success me-2"></i>Bulk Registration Summary
+          </h4>
+          <p class="text-muted small mb-0">
+            Operation results for assessment: <strong>{{ summary.test_name }}</strong>
+          </p>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{% url 'registration_create' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i> Register More
+          </a>
+          <a href="{% url 'registration_list' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-list-check me-1"></i> View Registrations
+          </a>
+        </div>
+      </div>
+
+      <!-- Metric KPI Cards -->
+      <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+          <div class="card border-0 shadow-sm rounded-3 p-3">
+            <div class="d-flex align-items-center">
+              <div class="p-3 bg-primary-subtle text-primary rounded-3 me-3">
+                <i class="bi bi-people fs-4"></i>
+              </div>
+              <div>
+                <div class="text-muted small">Total Selected</div>
+                <div class="fs-4 fw-bold">{{ summary.total_selected }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+          <div class="card border-0 shadow-sm rounded-3 p-3">
+            <div class="d-flex align-items-center">
+              <div class="p-3 bg-success-subtle text-success rounded-3 me-3">
+                <i class="bi bi-check-circle fs-4"></i>
+              </div>
+              <div>
+                <div class="text-muted small">Registered Successfully</div>
+                <div class="fs-4 fw-bold text-success">{{ summary.created_count }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+          <div class="card border-0 shadow-sm rounded-3 p-3">
+            <div class="d-flex align-items-center">
+              <div class="p-3 bg-warning-subtle text-warning rounded-3 me-3">
+                <i class="bi bi-exclamation-triangle fs-4"></i>
+              </div>
+              <div>
+                <div class="text-muted small">Already Registered</div>
+                <div class="fs-4 fw-bold text-warning">{{ summary.already_registered_count }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+          <div class="card border-0 shadow-sm rounded-3 p-3">
+            <div class="d-flex align-items-center">
+              <div class="p-3 bg-danger-subtle text-danger rounded-3 me-3">
+                <i class="bi bi-x-circle fs-4"></i>
+              </div>
+              <div>
+                <div class="text-muted small">Validation Rejected</div>
+                <div class="fs-4 fw-bold text-danger">{{ summary.rejected_count }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Successfully Registered Candidates -->
+      <div class="card border-0 shadow-sm rounded-3 mb-4">
+        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+          <h6 class="fw-bold mb-0 text-success">
+            <i class="bi bi-check-circle-fill me-2"></i>Successfully Created Registrations ({{ summary.created_count }})
+          </h6>
+          <span class="badge bg-success-subtle text-success border border-success-subtle">
+            {{ summary.created_count }} Candidate{{ summary.created_count|pluralize }}
+          </span>
+        </div>
+        <div class="card-body p-0">
+          {% if summary.created_candidates %}
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-4">#</th>
+                  <th>Candidate Name</th>
+                  <th>Email Address</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for cand in summary.created_candidates %}
+                <tr>
+                  <td class="ps-4 text-muted small">{{ forloop.counter }}</td>
+                  <td class="fw-semibold">{{ cand.name }}</td>
+                  <td><code>{{ cand.email }}</code></td>
+                  <td>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle">
+                      <i class="bi bi-check-lg me-1"></i> Registered
+                    </span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="p-4 text-center text-muted small">
+            No new registrations created in this operation.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Already Registered Candidates (Duplicates) -->
+      {% if summary.already_registered_candidates %}
+      <div class="card border-0 shadow-sm rounded-3 mb-4">
+        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+          <h6 class="fw-bold mb-0 text-warning">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>Already Registered Candidates ({{ summary.already_registered_count }})
+          </h6>
+          <span class="badge bg-warning-subtle text-warning border border-warning-subtle">
+            Duplicate Registrations Prevented
+          </span>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-4">#</th>
+                  <th>Candidate Name</th>
+                  <th>Email Address</th>
+                  <th>Policy Enforcement</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for cand in summary.already_registered_candidates %}
+                <tr>
+                  <td class="ps-4 text-muted small">{{ forloop.counter }}</td>
+                  <td class="fw-semibold">{{ cand.name }}</td>
+                  <td><code>{{ cand.email }}</code></td>
+                  <td>
+                    <span class="badge bg-secondary-subtle text-secondary border">
+                      Skipped (Already Registered)
+                    </span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Rejected Selections -->
+      {% if summary.rejected_candidates %}
+      <div class="card border-0 shadow-sm rounded-3 mb-4">
+        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+          <h6 class="fw-bold mb-0 text-danger">
+            <i class="bi bi-x-octagon-fill me-2"></i>Rejected Selections ({{ summary.rejected_count }})
+          </h6>
+          <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+            Ineligible Candidates
+          </span>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-4">#</th>
+                  <th>Candidate Identifier</th>
+                  <th>Rejection Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in summary.rejected_candidates %}
+                <tr>
+                  <td class="ps-4 text-muted small">{{ forloop.counter }}</td>
+                  <td class="fw-semibold text-danger">{{ item.identifier }}</td>
+                  <td>
+                    <span class="text-muted small">
+                      <i class="bi bi-info-circle me-1"></i> {{ item.reason }}
+                    </span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </main>
+</div>
+{% endblock %}

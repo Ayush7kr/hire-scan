@@ -23,4 +23,8 @@ urlpatterns = [
     path('export/questions/', views.export_questions_csv, name='analytics_export_questions'),
     path('export/topics/', views.export_topics_csv, name='analytics_export_topics'),
     path('export/completion/', views.export_completion_csv, name='analytics_export_completion'),
+
+    # Executive PDF Exports
+    path('export/tests/<uuid:test_id>/pdf/', views.export_test_summary_pdf, name='analytics_export_test_pdf'),
+    path('export/candidates/pdf/', views.export_candidate_results_pdf, name='analytics_export_candidates_pdf'),
 ]

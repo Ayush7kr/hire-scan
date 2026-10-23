@@ -13,6 +13,7 @@ Covers:
 9. Batch CSV exports with Spreadsheet Formula Injection (CSV Injection) protection.
 10. Authorization, IDOR protection, and regression validation.
 """
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 from django.test import TestCase, Client
@@ -34,6 +35,7 @@ from analytics.services import (
     get_question_analysis_analytics,
     get_topic_analytics,
     get_completion_analytics,
+    get_candidate_cross_assessment_analytics,
 )
 
 
@@ -619,4 +621,191 @@ class AdminUINavigationAndFilteringTests(AnalyticsBaseTestCase):
         res = self.admin_client.get(reverse('admin_dashboard'))
         self.assertEqual(res.status_code, 200)
         self.assertIn('audit-activity-container', res.content.decode('utf-8'))
+
+
+class AdvancedAnalyticsAndAutomatedReportTests(AnalyticsBaseTestCase):
+    """
+    Automated regression and functional tests for Phase C:
+    - Feature 4: Advanced Assessment Analytics (median, std dev, score brackets,
+      facility/discrimination psychometrics, cross-assessment candidate profiles).
+    - Feature 6: Automated Report Generation (ReportLab PDF exports for test summaries
+      and filtered candidate results with 2-line security footers).
+    """
+
+    def test_advanced_summary_metrics_median_std_dev_and_buckets(self):
+        """Advanced test metrics include median, std_dev, score range, and score distribution buckets."""
+        summary = get_test_summary_analytics(self.test1.test_id)
+
+        # 3 attempts with scores: Alice=5, Bob=3, Charlie=1
+        self.assertEqual(summary['median_score'], 3.0)
+        self.assertEqual(summary['score_range'], 4.0)
+        self.assertGreater(summary['std_dev_score'], 0)
+
+        # Distribution buckets
+        buckets = summary['distribution_buckets']
+        # Charlie is 20% (1/5) -> Below Standard (<50%)
+        b_below_50 = next(b for b in buckets if 'Below Standard' in b['label'])
+        self.assertEqual(b_below_50['count'], 1)
+        self.assertEqual(b_below_50['pct'], 33.3)
+
+        # Bob is 60% (3/5) -> Average (50-74%)
+        b_avg = next(b for b in buckets if 'Average' in b['label'])
+        self.assertEqual(b_avg['count'], 1)
+
+        # Alice is 100% (5/5) -> Excellent (90-100%)
+        b_exc = next(b for b in buckets if 'Excellent' in b['label'])
+        self.assertEqual(b_exc['count'], 1)
+
+    def test_question_analysis_facility_and_discrimination_indices(self):
+        """Question analysis computes item facility index and discrimination index."""
+        # Initial analysis with 3 attempts
+        analysis = get_question_analysis_analytics(self.test1.test_id)
+        self.assertTrue(len(analysis) > 0)
+        q1_data = analysis[0]
+        self.assertIsNotNone(q1_data['facility_index'])
+
+        # Create a 4th attempt for Dana to achieve cohort >= 4
+        self.att4 = start_attempt_for_registration(self.reg4)
+        for aq in self.att4.attempt_questions.all():
+            aq.selected_option = 3  # incorrect
+            aq.save()
+        evaluate_attempt(self.att4, submission_reason='manual')
+
+        # Ensure target question is deterministically present across all 4 finalized attempts
+        target_q = self.t1_questions[0]
+        for att in [self.att1, self.att2, self.att3, self.att4]:
+            aq, _ = AttemptQuestion.objects.get_or_create(
+                attempt=att,
+                question=target_q,
+                defaults={'selected_option': 3, 'is_correct': False, 'question_order': 99}
+            )
+            aq.is_correct = (aq.selected_option == target_q.correct_option)
+            aq.save()
+
+        analysis_cohort4 = get_question_analysis_analytics(self.test1.test_id)
+        # With cohort >= 4 on target_q, discrimination index is numerically calculated
+        q1_data_cohort4 = next(q for q in analysis_cohort4 if q['question'].question_id == target_q.question_id)
+        self.assertIsNotNone(q1_data_cohort4['discrimination_index'])
+        self.assertNotEqual(q1_data_cohort4['discrimination_display'], "— (Cohort < 4)")
+
+    def test_candidate_cross_assessment_analytics_with_multiple_assessments(self):
+        """Candidate cross-assessment analytics tracks performance across multiple assessments."""
+        # Alice already took test1 (score 5/5, 100%, passed)
+        # Register Alice for test2
+        reg_t2 = TestRegistration.objects.create(candidate=self.cand1, test=self.test2, status='registered')
+        att_t2 = start_attempt_for_registration(reg_t2)
+        aqs = list(att_t2.attempt_questions.all())
+        # Correctly answer 2 of 4 questions for test 2
+        for aq in aqs[:2]:
+            aq.selected_option = aq.question.correct_option
+            aq.save()
+        for aq in aqs[2:]:
+            aq.selected_option = 1  # incorrect (correct is 2)
+            aq.save()
+        evaluate_attempt(att_t2, submission_reason='manual')
+
+        cross_data = get_candidate_cross_assessment_analytics(self.cand1.candidate_id)
+        self.assertIsNotNone(cross_data)
+        self.assertEqual(cross_data['total_assigned'], 2)
+        self.assertEqual(cross_data['completed_count'], 2)
+        self.assertEqual(cross_data['passed_count'], 2)
+        self.assertEqual(cross_data['failed_count'], 0)
+        self.assertEqual(cross_data['pass_rate'], 100.0)
+        # (100% + 50%) / 2 = 75.0%
+        self.assertEqual(cross_data['avg_percentage'], 75.0)
+        self.assertEqual(len(cross_data['assessment_history']), 2)
+        self.assertEqual(cross_data['trend_percentages'], [100.0, 50.0])
+
+    def test_candidate_cross_assessment_analytics_empty_state_safety(self):
+        """Candidate with zero completed attempts returns graceful zero-metrics without DivisionByZero."""
+        # Dana has a registration but no finalized attempts
+        cross_data = get_candidate_cross_assessment_analytics(self.cand4.candidate_id)
+        self.assertIsNotNone(cross_data)
+        self.assertEqual(cross_data['completed_count'], 0)
+        self.assertEqual(cross_data['pass_rate'], 0.0)
+        self.assertEqual(cross_data['avg_percentage'], 0.0)
+        self.assertEqual(cross_data['assessment_history'], [])
+        self.assertEqual(cross_data['topic_strengths'], [])
+        self.assertEqual(cross_data['topic_weaknesses'], [])
+
+    def test_export_test_summary_pdf_admin_authorized(self):
+        """Admin can export Assessment Summary PDF containing ReportLab binary content."""
+        url = reverse('analytics_export_test_pdf', args=[self.test1.test_id])
+        res = self.admin_client.get(url)
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res['Content-Type'], 'application/pdf')
+        self.assertIn('attachment;', res['Content-Disposition'])
+        self.assertIn('HireScan_Assessment_Summary_', res['Content-Disposition'])
+        self.assertTrue(res.content.startswith(b'%PDF'))
+
+        # Verifies activity log was recorded
+        log = ActivityLog.objects.filter(activity_type='report_exported_pdf').first()
+        self.assertIsNotNone(log)
+        self.assertIn(self.test1.test_name, log.activity_details)
+
+    def test_export_test_summary_pdf_security_and_idor(self):
+        """Non-admin requests are redirected/blocked, non-existent tests return 404."""
+        url = reverse('analytics_export_test_pdf', args=[self.test1.test_id])
+
+        # Candidate cannot export assessment summary
+        res_cand = self.alice_client.get(url)
+        self.assertEqual(res_cand.status_code, 302)
+
+        # Anonymous cannot export
+        res_anon = self.anon_client.get(url)
+        self.assertEqual(res_anon.status_code, 302)
+
+        # 404 for invalid test ID
+        res_404 = self.admin_client.get(reverse('analytics_export_test_pdf', args=[uuid.uuid4()]))
+        self.assertEqual(res_404.status_code, 404)
+
+    def test_export_candidate_results_pdf_admin_authorized_and_filtered(self):
+        """Admin can export filter-scoped Candidate Results PDF."""
+        url = reverse('analytics_export_candidates_pdf')
+        res = self.admin_client.get(url, {'test_id': str(self.test1.test_id), 'outcome': 'passed'})
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res['Content-Type'], 'application/pdf')
+        self.assertIn('attachment;', res['Content-Disposition'])
+        self.assertTrue(res.content.startswith(b'%PDF'))
+
+    def test_export_candidate_results_pdf_empty_dataset_safe(self):
+        """Exporting Candidate Results PDF with a filter matching 0 candidates generates valid PDF without error."""
+        url = reverse('analytics_export_candidates_pdf')
+        res = self.admin_client.get(url, {'q': 'NonExistentCandidateNameXYZ999'})
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res['Content-Type'], 'application/pdf')
+        self.assertTrue(res.content.startswith(b'%PDF'))
+
+    def test_candidate_detail_view_renders_cross_analytics_cards(self):
+        """Candidate detail view displays cross-assessment performance, trends, and topic profiles."""
+        url = reverse('candidate_detail', args=[self.cand1.candidate_id])
+        res = self.admin_client.get(url)
+
+        self.assertEqual(res.status_code, 200)
+        content = res.content.decode('utf-8')
+        self.assertIn('Cross-Assessment Analytics', content)
+        self.assertIn('Assessment Score History', content)
+        self.assertIn('Demonstrated Topic Strengths', content)
+
+    def test_test_summary_detail_renders_pdf_button_and_distribution(self):
+        """Assessment summary detail page displays Download PDF Summary action and distribution cards."""
+        url = reverse('analytics_test_detail', args=[self.test1.test_id])
+        res = self.admin_client.get(url)
+
+        self.assertEqual(res.status_code, 200)
+        content = res.content.decode('utf-8')
+        self.assertIn('Download PDF Summary', content)
+        self.assertIn('Score Distribution Breakdown', content)
+        self.assertIn('Statistical Distribution', content)
+
+    def test_candidate_performance_renders_export_pdf_button(self):
+        """Candidate performance page renders Export Filtered PDF button."""
+        url = reverse('analytics_candidate_performance')
+        res = self.admin_client.get(url)
+
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('Export Filtered PDF', res.content.decode('utf-8'))
 

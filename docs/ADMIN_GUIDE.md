@@ -253,19 +253,65 @@ Navigate to `/admin/analytics/completion/` for recruitment pipeline velocity.
 
 ---
 
+---
+
+## 9. Mentor-Approved Platform Enhancements
+
+HireScan incorporates six production enhancements to expand institutional governance, psychometric analytics, and operational automation:
+
+### 9.1 Automated Email Notifications & Examination Reminders
+- **Transactional Triggers:** Registered examinees automatically receive branded HTML emails with plain-text fallback upon enrollment, test activation, and schedule cancellations.
+- **Automated Deadline Reminders:** Background cron/scheduled execution via Django management command:
+  ```bash
+  python manage.py send_assessment_reminders --hours=24
+  ```
+  Scans all upcoming active tests within the time window and dispatches non-duplicate reminders.
+- **Anti-Duplicate Mechanism:** Backed by database-level `NotificationLog` records preventing duplicate emails on repeated runs.
+
+### 9.2 Bulk Registration Summary
+- **Detailed Outcomes Screen:** Post-registration summary screen displaying overall metrics (Total Selected, Registrations Created, Already Registered, Rejected/Invalid).
+- **Candidate Breakdown Tables:** Displays candidate names, emails, and exact rejection/conflict reasons without leaving partial or corrupted records.
+
+### 9.3 Comprehensive Audit Logging & Categorization
+- **Full Operational Coverage:** Captures question authoring (`question_created`, `question_updated`, `question_deleted`), CSV and PDF exports (`report_exported_csv`, `report_exported_pdf`), examinee lifecycle events, and unauthorized access attempts (`unauthorized_access_attempt`).
+- **Activity Stream Dashboard:** Categorized badges (Security, Examination, Authoring, Reporting) with actor attribution (Admin, Candidate, System) in a responsive, independently scrollable container.
+
+### 9.4 Advanced Assessment Psychometrics & Cross-Assessment Analytics
+- **Statistical Spread:** Median score, score range, and standard deviation calculations across finalized examinee attempts.
+- **Score Distribution Breakdown:** Quadrant buckets (Excellent 90–100%, Proficient 75–89%, Average 50–74%, Below Standard <50%).
+- **Item Psychometrics:**
+  - **Facility Index ($P$):** Proportion of candidates answering correctly ($0.00$ to $1.00$).
+  - **Discrimination Index ($D$):** Upper 27% vs. lower 27% comparison formula for cohorts $\ge 4$, flagging balanced, high-accuracy, and review items.
+- **Candidate Competency Profiles:** Cross-assessment score history, multi-test timelines, and demonstrated topic strengths ($\ge 75\%$) vs. focus areas ($< 50\%$) on candidate detail pages.
+
+### 9.5 Assessment Integrity & Tamper-Evident Defenses
+- **Server-Side Timestamp Enforcement:** Clock timing, autosave validations, and manual submissions verified against authoritative server clocks.
+- **Mid-Flight Cancellation Guard:** Revoked or cancelled assessments immediately disallow subsequent answer autosaves or submissions.
+- **Authorization & IDOR Protection:** Candidate attempts, scorecards, and administrative exports enforce strict session verification and log unauthorized probes.
+
+### 9.6 Automated Executive Report Generation
+- **Assessment Summary PDF:** Formatted ReportLab PDF containing institutional KPI headers, statistical distributions, score brackets, topic breakdowns, and the mandatory two-line security footer.
+- **Filtered Candidate Results PDF:** Export current candidate search and filter selections to an executive PDF report.
+
+---
+
 ## Summary of Administrator URLs
 
 | Module | URL | Description |
 | :--- | :--- | :--- |
 | **Login** | `/admin/login/` | Secure administrator authentication |
-| **Dashboard** | `/admin/dashboard/` | KPI cards and live audit activity stream |
-| **Candidates** | `/admin/candidates/` | Candidate directory and status management |
+| **Dashboard** | `/dashboard/` | KPI cards and live audit activity stream |
+| **Candidates** | `/admin/candidates/` | Candidate directory and cross-assessment profile |
 | **Candidate Import** | `/admin/candidates/import/` | CSV batch candidate onboarding |
 | **Tests** | `/admin/tests/` | Assessment configurations and question banks |
 | **Test Create** | `/admin/tests/create/` | New assessment creation wizard |
 | **Registrations** | `/admin/registrations/` | Assessment scheduling and enrollment |
-| **Test Summaries** | `/admin/analytics/tests/` | Cohort benchmarks and pass rates |
-| **Candidate Analytics** | `/admin/analytics/candidates/` | Candidate scoring leaderboards |
-| **Question Analytics** | `/admin/analytics/questions/` | Item difficulty and discrimination analysis |
-| **Topic Analytics** | `/admin/analytics/topics/` | Domain and skill competency breakdown |
-| **Completion Pipeline** | `/admin/analytics/completion/` | Candidate progression and drop-off funnel |
+| **Bulk Summary** | `/admin/registrations/bulk-summary/` | Post-registration breakdown and conflict report |
+| **Test Summaries** | `/dashboard/tests/` | Cohort benchmarks, median, and distributions |
+| **Test Summary PDF** | `/dashboard/export/tests/<uuid>/pdf/` | Downloadable executive assessment PDF summary |
+| **Candidate Analytics** | `/dashboard/candidates/` | Candidate scoring leaderboards and percentiles |
+| **Candidate Results PDF** | `/dashboard/export/candidates/pdf/` | Filtered candidate performance PDF export |
+| **Question Analytics** | `/dashboard/questions/` | Item facility and discrimination index psychometrics |
+| **Topic Analytics** | `/dashboard/topics/` | Domain and skill competency breakdown |
+| **Completion Pipeline** | `/dashboard/completion/` | Candidate progression and drop-off funnel |
+

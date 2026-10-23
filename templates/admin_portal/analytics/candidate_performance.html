@@ -30,7 +30,10 @@
           <p class="text-muted small mb-0">Inspect individual assessment outcomes, cohort rankings, and official scorecards.</p>
         </div>
 
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{% url 'analytics_export_candidates_pdf' %}{% if filter_querystring %}?{{ filter_querystring }}{% endif %}" class="btn btn-outline-danger btn-sm fw-bold">
+            <i class="bi bi-file-earmark-pdf me-1"></i> Export Filtered PDF
+          </a>
           <a href="{% url 'analytics_export_candidates' %}{% if filter_querystring %}?{{ filter_querystring }}{% endif %}" class="btn btn-outline-success btn-sm fw-bold">
             <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export Filtered CSV
           </a>

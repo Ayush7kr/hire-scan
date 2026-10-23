@@ -20,7 +20,13 @@ from django.utils.dateparse import parse_datetime
 from accounts.decorators import admin_required
 from accounts.models import Candidate, ActivityLog
 from assessments.models import Test, Question, TestRegistration
+from assessments.notifications import (
+    send_registration_notification,
+    send_assessment_available_notifications,
+    send_assessment_cancelled_notifications,
+)
 from attempts.models import TestAttempt
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -403,6 +409,8 @@ def test_toggle_status(request, test_id):
         test.save()
         messages.success(request, f"Test '{test.test_name}' is now ACTIVE and available to registered candidates.")
         act_type = 'test_activated'
+        # Notify registered candidates of assessment availability
+        send_assessment_available_notifications(test, request=request)
     else:
         test.is_active = False
         test.save()
@@ -436,6 +444,8 @@ def test_toggle_cancel(request, test_id):
             activity_type='test_cancelled',
             activity_details=f"Admin cancelled test '{test.test_name}'."
         )
+        # Notify registered candidates of assessment cancellation
+        send_assessment_cancelled_notifications(test, request=request)
     else:
         test.is_cancelled = False
         test.save()
@@ -446,6 +456,7 @@ def test_toggle_cancel(request, test_id):
             activity_details=f"Admin uncancelled test '{test.test_name}'."
         )
     return redirect('test_detail', test_id=test.test_id)
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -549,7 +560,7 @@ def question_create(request, test_id):
             errors['question_text'] = 'A question with this exact text already exists in this test.'
 
         if not errors:
-            Question.objects.create(
+            q = Question.objects.create(
                 test=test,
                 question_text=q_text,
                 option1=opt1,
@@ -560,6 +571,11 @@ def question_create(request, test_id):
                 topic=topic,
                 difficulty=difficulty,
                 suggestions=suggestions
+            )
+            ActivityLog.objects.create(
+                admin=request.admin_user,
+                activity_type='question_created',
+                activity_details=f"Admin added question '{q_text[:50]}' to test '{test.test_name}'."
             )
             messages.success(request, 'Question added successfully to the question bank.')
             return redirect('question_list', test_id=test.test_id)
@@ -632,6 +648,12 @@ def question_edit(request, test_id, question_id):
             question.suggestions = suggestions
             question.save()
 
+            ActivityLog.objects.create(
+                admin=request.admin_user,
+                activity_type='question_updated',
+                activity_details=f"Admin updated question '{question.question_text[:50]}' in test '{test.test_name}'."
+            )
+
             messages.success(request, 'Question updated successfully.')
             return redirect('question_list', test_id=test.test_id)
 
@@ -652,7 +674,14 @@ def question_delete(request, test_id, question_id):
     """
     test = get_object_or_404(Test, test_id=test_id)
     question = get_object_or_404(Question, question_id=question_id, test=test)
+    q_preview = question.question_text[:50]
     question.delete()
+
+    ActivityLog.objects.create(
+        admin=request.admin_user,
+        activity_type='question_deleted',
+        activity_details=f"Admin deleted question '{q_preview}' from test '{test.test_name}'."
+    )
 
     bank_count = Question.objects.filter(test=test).count()
     if test.is_active and bank_count < test.total_questions:
@@ -1138,15 +1167,42 @@ def registration_create(request):
                             f"{len(rejected)} candidate selection(s) were rejected: {rej_msgs}{more_rej}."
                         )
 
+                    # Structured bulk summary
+                    summary_data = {
+                        'test_name': test.test_name,
+                        'test_id': str(test.test_id),
+                        'total_selected': len([c for c in candidate_ids if c.strip()]),
+                        'created_count': len(created_candidates),
+                        'created_candidates': [{'name': c.name, 'email': c.email} for c in created_candidates],
+                        'already_registered_count': len(already_registered),
+                        'already_registered_candidates': [{'name': c.name, 'email': c.email} for c in already_registered],
+                        'rejected_count': len(rejected),
+                        'rejected_candidates': [{'identifier': name, 'reason': reason} for name, reason in rejected],
+                        'error_count': 1 if errors.get('general') else 0,
+                        'general_error': errors.get('general', ''),
+                    }
+                    request.session['bulk_registration_summary'] = summary_data
+
+                    ActivityLog.objects.create(
+                        admin=request.admin_user,
+                        activity_type='bulk_candidates_registered',
+                        activity_details=(
+                            f"Admin registered {len(created_candidates)} candidate(s) for test '{test.test_name}' "
+                            f"({len(already_registered)} already registered, {len(rejected)} rejected)."
+                        )
+                    )
+
+                    # Dispatched registration emails for newly registered candidates
+                    for cand in created_candidates:
+                        send_registration_notification(cand, test, request=request)
+
                     if created_candidates and not errors.get('general'):
-                        return redirect('registration_list')
+                        return redirect('registration_bulk_summary')
                     elif not created_candidates and not errors.get('general'):
-                        if already_registered and not rejected:
-                            errors['general'] = f"All {len(already_registered)} selected candidate(s) are already registered for '{test.test_name}'."
-                        elif rejected and not already_registered:
-                            errors['general'] = "All selected candidate(s) were rejected."
+                        if already_registered or rejected:
+                            return redirect('registration_bulk_summary')
                         else:
-                            errors['general'] = f"No registrations created. {len(already_registered)} already registered, {len(rejected)} rejected."
+                            errors['general'] = "No registrations created."
                 elif rejected:
                     rej_msgs = "; ".join([f"{name}: {reason}" for name, reason in rejected[:5]])
                     errors['general'] = f"Selected candidate(s) rejected: {rej_msgs}."
@@ -1189,6 +1245,8 @@ def registration_create(request):
                             activity_type='candidate_registered',
                             activity_details=f"Admin registered {candidate.email} for test '{test.test_name}'."
                         )
+                    # Notify candidate
+                    send_registration_notification(candidate, test, request=request)
                     messages.success(
                         request,
                         f"Candidate '{candidate.name}' registered successfully for '{test.test_name}'."
@@ -1204,6 +1262,24 @@ def registration_create(request):
         'selected_mode': selected_mode,
     }
     return render(request, 'admin_portal/registrations/create.html', context)
+
+
+@admin_required
+def registration_bulk_summary(request):
+    """
+    Display comprehensive post-registration summary report for bulk candidate operations.
+    Shows created registrations, duplicate registrations, and validation rejections.
+    """
+    summary = request.session.get('bulk_registration_summary')
+    if not summary:
+        messages.info(request, "No recent bulk registration summary found.")
+        return redirect('registration_list')
+
+    context = {
+        'summary': summary,
+    }
+    return render(request, 'admin_portal/registrations/bulk_summary.html', context)
+
 
 
 @admin_required

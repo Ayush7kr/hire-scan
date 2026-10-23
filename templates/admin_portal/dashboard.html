@@ -207,23 +207,44 @@
                   <div class="d-flex flex-column gap-3">
                     {% for act in recent_activity %}
                       <div class="d-flex align-items-start gap-2 pb-2 border-bottom">
-                        <div class="small mt-1">
-                          {% if 'login' in act.activity_type %}
-                            <i class="bi bi-person-check-fill text-primary"></i>
+                        <div class="small mt-1 flex-shrink-0">
+                          {% if 'unauthorized' in act.activity_type or 'failed' in act.activity_type or 'cancel' in act.activity_type %}
+                            <i class="bi bi-shield-exclamation text-danger fs-6"></i>
+                          {% elif 'login' in act.activity_type or 'otp' in act.activity_type %}
+                            <i class="bi bi-person-check-fill text-primary fs-6"></i>
                           {% elif 'candidate' in act.activity_type %}
-                            <i class="bi bi-people-fill text-success"></i>
+                            <i class="bi bi-person-badge-fill text-success fs-6"></i>
                           {% elif 'test' in act.activity_type or 'question' in act.activity_type %}
-                            <i class="bi bi-journal-check text-info"></i>
+                            <i class="bi bi-journal-check text-info fs-6"></i>
                           {% elif 'registration' in act.activity_type %}
-                            <i class="bi bi-card-checklist text-purple"></i>
+                            <i class="bi bi-card-checklist text-purple fs-6"></i>
+                          {% elif 'ATTEMPT_STARTED' in act.activity_type %}
+                            <i class="bi bi-play-circle-fill text-primary fs-6"></i>
+                          {% elif 'ATTEMPT_SUBMITTED' in act.activity_type %}
+                            <i class="bi bi-check-circle-fill text-success fs-6"></i>
+                          {% elif 'TIMED_OUT' in act.activity_type %}
+                            <i class="bi bi-alarm-fill text-warning fs-6"></i>
+                          {% elif 'export' in act.activity_type or 'pdf' in act.activity_type %}
+                            <i class="bi bi-file-earmark-arrow-down-fill text-warning fs-6"></i>
                           {% else %}
-                            <i class="bi bi-activity text-secondary"></i>
+                            <i class="bi bi-activity text-secondary fs-6"></i>
                           {% endif %}
                         </div>
-                        <div class="flex-grow-1">
-                          <div class="small fw-semibold text-dark">{{ act.activity_type|title }}</div>
-                          <div class="small text-muted">{{ act.activity_details|truncatechars:70 }}</div>
-                          <div class="text-secondary" style="font-size: 0.75rem;">{{ act.occurred_at|timesince }} ago</div>
+                        <div class="flex-grow-1" style="min-width: 0;">
+                          <div class="d-flex align-items-center justify-content-between gap-1 mb-1">
+                            <span class="small fw-semibold text-dark text-truncate">{{ act.activity_type|title }}</span>
+                            {% if act.admin %}
+                              <span class="badge bg-primary-subtle text-primary border small flex-shrink-0" style="font-size: 0.65rem;">Admin</span>
+                            {% elif act.candidate %}
+                              <span class="badge bg-success-subtle text-success border small flex-shrink-0" style="font-size: 0.65rem;">Candidate</span>
+                            {% else %}
+                              <span class="badge bg-secondary-subtle text-secondary border small flex-shrink-0" style="font-size: 0.65rem;">System</span>
+                            {% endif %}
+                          </div>
+                          <div class="small text-muted text-break" title="{{ act.activity_details }}">{{ act.activity_details|truncatechars:85 }}</div>
+                          <div class="text-secondary mt-1" style="font-size: 0.72rem;">
+                            <i class="bi bi-clock me-1"></i>{{ act.occurred_at|timesince }} ago
+                          </div>
                         </div>
                       </div>
                     {% endfor %}

@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from accounts.decorators import candidate_required
-from accounts.models import Candidate, Admin
+from accounts.models import Candidate, Admin, ActivityLog
 from assessments.models import TestRegistration, Question
 from attempts.models import TestAttempt, AttemptQuestion
 from attempts.services import (
@@ -95,6 +95,11 @@ def test_instructions(request, registration_id):
     )
 
     if registration.candidate_id != request.candidate_user.candidate_id:
+        ActivityLog.objects.create(
+            candidate=request.candidate_user,
+            activity_type='unauthorized_access_attempt',
+            activity_details=f"Candidate attempted unauthorized access to instructions for registration {registration_id}."
+        )
         return HttpResponseForbidden("You are not authorized to view this registration.")
 
     # Check if attempt already exists
@@ -139,6 +144,11 @@ def test_start(request, registration_id):
     )
 
     if registration.candidate_id != request.candidate_user.candidate_id:
+        ActivityLog.objects.create(
+            candidate=request.candidate_user,
+            activity_type='unauthorized_access_attempt',
+            activity_details=f"Candidate attempted unauthorized start of registration {registration_id}."
+        )
         return HttpResponseForbidden("You are not authorized to start this registration.")
 
     # Check if attempt already exists
@@ -181,7 +191,18 @@ def test_take(request, attempt_id):
     )
 
     if attempt.registration.candidate_id != request.candidate_user.candidate_id:
+        ActivityLog.objects.create(
+            candidate=request.candidate_user,
+            attempt=attempt,
+            activity_type='unauthorized_access_attempt',
+            activity_details=f"Candidate attempted unauthorized access to test interface for attempt {attempt_id}."
+        )
         return HttpResponseForbidden("You are not authorized to access this test attempt.")
+
+    # Integrity guard: Disallow continuing if test is cancelled
+    if attempt.registration.test.is_cancelled:
+        messages.warning(request, "This assessment has been cancelled by an administrator.")
+        return redirect('candidate_dashboard')
 
     # If already finalized, redirect to results
     if attempt.status in ['completed', 'expired']:
@@ -230,7 +251,16 @@ def test_autosave(request, attempt_id):
     )
 
     if attempt.registration.candidate_id != request.candidate_user.candidate_id:
+        ActivityLog.objects.create(
+            candidate=request.candidate_user,
+            attempt=attempt,
+            activity_type='unauthorized_access_attempt',
+            activity_details=f"Candidate attempted unauthorized autosave to attempt {attempt_id}."
+        )
         return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=403)
+
+    if attempt.registration.test.is_cancelled:
+        return JsonResponse({'success': False, 'error': 'Assessment has been cancelled.'}, status=400)
 
     if attempt.status in ['completed', 'expired']:
         return JsonResponse({
@@ -330,7 +360,18 @@ def test_submit(request, attempt_id):
     )
 
     if attempt.registration.candidate_id != request.candidate_user.candidate_id:
+        ActivityLog.objects.create(
+            candidate=request.candidate_user,
+            attempt=attempt,
+            activity_type='unauthorized_access_attempt',
+            activity_details=f"Candidate attempted unauthorized submission for attempt {attempt_id}."
+        )
         return HttpResponseForbidden("You are not authorized to submit this attempt.")
+
+    # Integrity guard: Disallow submitting cancelled assessment
+    if attempt.registration.test.is_cancelled:
+        messages.warning(request, "This assessment was cancelled by an administrator.")
+        return redirect('candidate_dashboard')
 
     # If already finalized, directly redirect
     if attempt.status in ['completed', 'expired']:
@@ -376,6 +417,10 @@ def test_results(request, attempt_id):
 
     if not is_admin:
         if str(attempt.registration.candidate_id) != str(candidate_id):
+            ActivityLog.objects.create(
+                activity_type='unauthorized_access_attempt',
+                activity_details=f"Unauthorized access attempt to test results for attempt {attempt_id}."
+            )
             return HttpResponseForbidden("You are not authorized to view these results.")
 
     # If still in progress, check if expired
@@ -433,6 +478,10 @@ def attempt_scorecard_pdf(request, attempt_id):
 
     if not is_admin:
         if str(attempt.registration.candidate_id) != str(candidate_id):
+            ActivityLog.objects.create(
+                activity_type='unauthorized_access_attempt',
+                activity_details=f"Unauthorized download attempt for scorecard PDF of attempt {attempt_id}."
+            )
             return HttpResponseForbidden("You are not authorized to download this scorecard.")
 
     # If still in progress, check if expired
@@ -445,6 +494,15 @@ def attempt_scorecard_pdf(request, attempt_id):
 
     from analytics.pdf_export import generate_candidate_scorecard_pdf
     pdf_bytes = generate_candidate_scorecard_pdf(attempt)
+
+    # Audit log scorecard download
+    ActivityLog.objects.create(
+        admin=request.admin_user if is_admin else None,
+        candidate=attempt.registration.candidate if not is_admin else None,
+        attempt=attempt,
+        activity_type='scorecard_downloaded_pdf',
+        activity_details=f"Scorecard PDF downloaded for {attempt.registration.candidate.name} ('{attempt.registration.test.test_name}')."
+    )
 
     import re
     safe_cand = re.sub(r'[^a-zA-Z0-9_-]', '_', attempt.registration.candidate.name)[:20]

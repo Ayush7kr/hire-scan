@@ -20,6 +20,7 @@ from django.views.decorators.http import require_http_methods
 from accounts.decorators import admin_required
 from accounts.models import Candidate, ActivityLog
 from assessments.models import Test, TestRegistration
+from analytics.services import get_candidate_cross_assessment_analytics
 
 
 @admin_required
@@ -93,9 +94,12 @@ def candidate_detail(request, candidate_id):
             'attempt': attempt,
         })
 
+    cross_analytics = get_candidate_cross_assessment_analytics(candidate.candidate_id)
+
     context = {
         'candidate': candidate,
         'reg_data': reg_data,
+        'cross_analytics': cross_analytics,
     }
     return render(request, 'admin_portal/candidates/detail.html', context)
 

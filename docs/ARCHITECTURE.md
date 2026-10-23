@@ -97,6 +97,7 @@ All database tables utilize cryptographically secure, collision-resistant UUID4 
 | `test_registration`| `assessments.TestRegistration` | `registration_id` (UUID) | Bridge table connecting candidate to test. Enforces `UNIQUE(candidate, test)`. |
 | `test_attempt` | `attempts.TestAttempt` | `attempt_id` (UUID) | Single attempt per registration via `OneToOneField`. Tracks score, time, status, and reason. |
 | `attempt_question` | `attempts.AttemptQuestion` | `aq_id` (UUID) | Individual questions assigned to an attempt. Enforces `UNIQUE(attempt, question)`. |
+| `notification_log` | `assessments.NotificationLog` | `log_id` (UUID) | Audit log of candidate email notifications (registered, available, reminder, cancelled). |
 
 ---
 
@@ -206,9 +207,21 @@ erDiagram
         datetime answered_at
     }
 
+    NOTIFICATION_LOG {
+        uuid log_id PK
+        uuid candidate_id FK
+        uuid test_id FK
+        string notification_type
+        string status
+        datetime sent_at
+        text details
+    }
+
     CANDIDATE ||--o{ TEST_REGISTRATION : "is registered for"
+    CANDIDATE ||--o{ NOTIFICATION_LOG : "receives"
     TEST ||--o{ TEST_REGISTRATION : "has candidate registrations"
     TEST ||--o{ QUESTION : "contains question bank"
+    TEST ||--o{ NOTIFICATION_LOG : "triggers"
     TEST_REGISTRATION ||--o| TEST_ATTEMPT : "has exactly one"
     TEST_ATTEMPT ||--o{ ATTEMPT_QUESTION : "contains assigned questions"
     QUESTION ||--o{ ATTEMPT_QUESTION : "appears in"
