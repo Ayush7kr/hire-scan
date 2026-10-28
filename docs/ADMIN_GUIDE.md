@@ -281,6 +281,7 @@ HireScan incorporates six production enhancements to expand institutional govern
   ```
   Scans all upcoming active tests within the time window and dispatches non-duplicate reminders.
 - **Anti-Duplicate Mechanism:** Backed by database-level `NotificationLog` records preventing duplicate emails on repeated runs.
+- **Dedicated Delivery Monitor (`/admin/registrations/notifications/`):** Centralized administration console to inspect all outgoing candidate emails, filter by status (`Sent` vs `Failed`), filter by type (`registered`, `available`, `reminder`, `schedule_updated`, `cancelled`), and execute safe retries for failed dispatches with credential redaction.
 
 ### 9.2 Bulk Registration Summary
 - **Detailed Outcomes Screen:** Post-registration summary screen displaying overall metrics (Total Selected, Registrations Created, Already Registered, Rejected/Invalid).
@@ -307,6 +308,10 @@ HireScan incorporates six production enhancements to expand institutional govern
 - **Assessment Summary PDF:** Formatted ReportLab PDF containing institutional KPI headers, statistical distributions, score brackets, topic breakdowns, and the mandatory two-line security footer.
 - **Filtered Candidate Results PDF:** Export current candidate search and filter selections to an executive PDF report.
 
+### 9.7 Spreadsheet Formula Injection Defense & Error CSV Exports
+- **Formula Injection Defense:** All generated CSV reports and downloadable error files sanitize every cell via `sanitize_csv_cell()` to prevent CSV formula injection (`=`, `+`, `-`, `@`, `\t`, `\r`).
+- **Downloadable Error CSVs:** During bulk candidate or question bank imports, validation failures can be immediately downloaded as dedicated CSV files (`candidate_import_errors.csv` and `question_import_errors.csv`) with row numbers and exact rejection reasons.
+
 ---
 
 ## Summary of Administrator URLs
@@ -328,4 +333,7 @@ HireScan incorporates six production enhancements to expand institutional govern
 | **Question Analytics** | `/dashboard/questions/` | Item facility and discrimination index psychometrics |
 | **Topic Analytics** | `/dashboard/topics/` | Domain and skill competency breakdown |
 | **Completion Pipeline** | `/dashboard/completion/` | Candidate progression and drop-off funnel |
+| **Notifications Monitor**| `/admin/registrations/notifications/` | Candidate email delivery monitor & safe retry console |
+| **Candidate Errors CSV**| `/admin/candidates/import/errors/csv/` | Downloadable sanitized candidate import error CSV |
+| **Question Errors CSV** | `/admin/assessments/questions/import/errors/csv/` | Downloadable sanitized question import error CSV |
 

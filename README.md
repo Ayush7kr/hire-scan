@@ -5,7 +5,7 @@
 [![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white)](https://getbootstrap.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-176%20Passed%20(100%25)-success?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/Ayush7kr/hire-scan)
+[![Tests](https://img.shields.io/badge/Tests-187%20Passed%20(100%25)-success?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/Ayush7kr/hire-scan)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 HireScan is a secure, high-performance, enterprise-grade technical assessment and test management tool. Engineered with Django and Python, HireScan automates candidate onboarding, conducts timed, randomized examinations with zero answer leakage, and delivers executive psychometric and competency analytics.
@@ -136,14 +136,19 @@ Dive deeper into every facet of HireScan with our dedicated guides:
   - **Question Item Analysis:** Psychometric accuracy percentages and discrimination indices.
   - **Topic Competency:** Domain skill gap breakdown.
   - **Assessment Pipeline:** Candidate progression funnel from registration to submission.
-- **Export Capabilities:**
+- **Export Capabilities & Data Integrity:**
   - Official branded Candidate Scorecard PDF generation powered by ReportLab.
-  - Batch CSV exports protected against spreadsheet formula injection (`=`, `+`, `-`, `@`).
+  - Full CSV export and downloadable import error reports (`candidate_import_errors.csv`, `question_import_errors.csv`) protected against spreadsheet formula injection (`=`, `+`, `-`, `@`).
+- **Operational Monitoring & Safe Notification Retries:**
+  - Dedicated notification delivery monitor (`/admin/registrations/notifications/`) tracking email delivery state (`Sent` vs `Failed`).
+  - Idempotent, deduplicated retry mechanism with credential redaction for failed dispatches.
+  - Real-time operational dashboard indicators for upcoming, in-progress, completed assessments, and pending attempts.
 - **Production-Ready Operations:**
   - Multi-stage `Dockerfile` running as non-root user (`hirescan`).
   - `docker-compose.yml` orchestrating PostgreSQL 16 and Gunicorn WSGI.
   - Automated health check probes (`/health/`, `/healthz/`).
-  - GitHub Actions CI workflow executing linting, PostgreSQL migrations, and 176 automated tests.
+  - GitHub Actions CI workflow executing linting, PostgreSQL migrations, and 187 automated tests.
+
 
 ---
 

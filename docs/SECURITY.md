@@ -14,6 +14,8 @@ HireScan is engineered with defensive programming principles and enterprise-grad
 7. [Session & Cookie Security](#7-session--cookie-security)
 8. [HTTP Security Headers & Transport Layer](#8-http-security-headers--transport-layer)
 9. [Audit Logging & Forensic Traceability](#9-audit-logging--forensic-traceability)
+10. [Spreadsheet Formula Injection (CSV Injection) Defense](#10-spreadsheet-formula-injection-csv-injection-defense)
+11. [Notification Delivery Integrity & Safe Retry Controls](#11-notification-delivery-integrity--safe-retry-controls)
 
 ---
 
@@ -30,6 +32,8 @@ HireScan addresses several core attack vectors inherent in online examination sy
 | **Session Hijacking** | Stealing session tokens over insecure networks. | HTTP-only, Secure, SameSite cookies with session key regeneration on login. |
 | **Client Clock Tampering**| Manipulating local device clocks to extend exam duration. | Duration and expiry are evaluated exclusively against server-side UTC timestamps. |
 | **SQL Injection** | Injecting SQL syntax through search fields or CSV uploads. | 100% parameterized queries via Django ORM; zero raw string SQL concatenation. |
+| **Formula Injection (CSV)**| Executing malicious commands or DDE payloads when opening exported CSVs in Excel/Sheets. | All CSV outputs and error CSV downloads wrap fields in `sanitize_csv_cell()`, prefixing `=,+,-,@` with `'`. |
+| **SMTP Delivery Hijack** | Exploiting notification retry endpoints or exposing SMTP credentials during mail failures. | Safe retries enforce deduplication, recipient/test active checks, credential redaction, and `ActivityLog` audits. |
 
 ---
 
@@ -147,3 +151,43 @@ Every sensitive administrative action is logged to the `ActivityLog` table (`acc
 - **Timestamp:** High-precision UTC timestamp.
 
 The audit log is append-only and provides an immutable record for security reviews, compliance, and dispute resolution.
+
+---
+
+## 10. Spreadsheet Formula Injection (CSV Injection) Defense
+
+Online assessment platforms generate CSV exports consumed by administrative personnel using Microsoft Excel, Google Sheets, or LibreOffice Calc. If examinee profiles, test titles, question texts, or error payloads contain formula triggers (`=`, `+`, `-`, `@`, `\t`, `\r`), spreadsheet engines can automatically execute arbitrary formulas or initiate Dynamic Data Exchange (DDE) attacks to achieve Remote Code Execution (RCE) on the administrator's workstation.
+
+HireScan enforces uniform formula injection defense across all CSV generation points:
+- **Assessment Performance Reports:** `/admin/analytics/reports/csv/`
+- **Candidate Bulk Import Error Reports:** `/admin/candidates/import/errors/csv/`
+- **Question Bank Import Error Reports:** `/admin/assessments/questions/import/errors/csv/`
+
+### Sanitization Implementation:
+```python
+def sanitize_csv_cell(val):
+    """
+    Prevent CSV formula injection by prepending a single quote
+    if the string begins with =, +, -, @, tab, or carriage return.
+    """
+    if val is None:
+        return ''
+    s = str(val)
+    if s and s[0] in ('=', '+', '-', '@', '\t', '\r'):
+        return f"'{s}"
+    return s
+```
+By prefixing formula triggers with a single quote (`'`), spreadsheet applications treat the content strictly as text, neutralizing formula evaluation, external data exfiltration hyperlinks, and macro invocations.
+
+---
+
+## 11. Notification Delivery Integrity & Safe Retry Controls
+
+Candidate examination schedules, activation announcements, and access links are delivered via email. To defend against notification bombardment, credential leakage, and unauthorized mail dispatches:
+
+1. **Role-Gated Access:** The notification delivery monitor (`/admin/registrations/notifications/`) and retry endpoint (`/admin/registrations/notifications/<log_id>/retry/`) are strictly protected by `@admin_required`.
+2. **Idempotent Anti-Duplicate Safeguard:** Prior to dispatching or retrying an email, HireScan queries `NotificationLog` to verify whether an email of the same type was already successfully delivered to the candidate for the given assessment.
+3. **Active Status Verification:** Retries are blocked if the candidate has been deactivated (`is_active=False`) or if the assessment has been cancelled (`is_cancelled=True`).
+4. **Credential & Secret Redaction:** If an SMTP server failure occurs, the error text is sanitized before logging into `error_message`, stripping out SMTP passwords, bearer tokens, and sensitive network trace headers.
+5. **Full Audit Traceability:** Every notification retry attempt is recorded in `ActivityLog` (`activity_type='notification_retried'`), logging the administrator's ID, timestamp, and target notification ID.
+

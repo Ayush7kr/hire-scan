@@ -73,7 +73,7 @@ flowchart TD
 | :--- | :--- | :--- |
 | `accounts` | Identity & Access Management | Admin password auth, Candidate OTP generation/validation, PBKDF2 hashing, session control, activity logging. |
 | `candidates` | Candidate Management | Candidate profile directory, CSV roster bulk imports, search, status toggles (`is_active`). |
-| `assessments` | Assessment Configuration | Test authoring, Question Bank CRUD, question CSV import, question sufficiency verification, test registration. |
+| `assessments` | Assessment Configuration | Test authoring, Question Bank CRUD, question CSV import, question sufficiency verification, test registration, notification delivery monitoring & safe retries. |
 | `attempts` | Examination Delivery | Candidate test session, question assignment, asynchronous autosave, server-side timer enforcement, atomic evaluation. |
 | `analytics` | Business Intelligence | Test summaries, candidate leaderboards, question discrimination analysis, topic radar charts, PDF generation. |
 | `config` | Application Root | Django settings, middleware pipeline, URL routing, custom error handlers (400, 403, 404, 500), health checks. |
@@ -97,7 +97,7 @@ All database tables utilize cryptographically secure, collision-resistant UUID4 
 | `test_registration`| `assessments.TestRegistration` | `registration_id` (UUID) | Bridge table connecting candidate to test. Enforces `UNIQUE(candidate, test)`. |
 | `test_attempt` | `attempts.TestAttempt` | `attempt_id` (UUID) | Single attempt per registration via `OneToOneField`. Tracks score, time, status, and reason. |
 | `attempt_question` | `attempts.AttemptQuestion` | `aq_id` (UUID) | Individual questions assigned to an attempt. Enforces `UNIQUE(attempt, question)`. |
-| `notification_log` | `assessments.NotificationLog` | `log_id` (UUID) | Audit log of candidate email notifications (registered, available, reminder, cancelled). |
+| `notification_log` | `assessments.NotificationLog` | `notification_id` (UUID) | Audit log of candidate email notifications (registered, available, reminder, cancelled, schedule_updated). |
 
 ---
 
@@ -208,13 +208,15 @@ erDiagram
     }
 
     NOTIFICATION_LOG {
-        uuid log_id PK
+        uuid notification_id PK
         uuid candidate_id FK
         uuid test_id FK
         string notification_type
+        string recipient_email
+        string subject
         string status
+        text error_message
         datetime sent_at
-        text details
     }
 
     CANDIDATE ||--o{ TEST_REGISTRATION : "is registered for"
@@ -318,3 +320,6 @@ To guarantee sub-second dashboard and reporting query latency across tens of tho
 - **`idx_attempt_status`:** Aggregations for `in_progress`, `completed`, and `expired` attempts.
 - **`idx_aq_attempt_question`:** Fast retrieval of question states during exam autosaves.
 - **`idx_activity_timestamp`:** Sorting and slicing the live executive audit stream.
+- **`idx_notif_cand_test_type`:** Compound index on `(candidate, test, notification_type)` enforcing fast notification deduplication.
+- **`idx_notif_sent_at`:** Chronological sorting for the notification delivery monitor.
+- **`idx_notif_status`:** Rapid filtering for failed vs. sent notifications.
