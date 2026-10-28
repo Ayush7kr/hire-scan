@@ -20,7 +20,8 @@ from django.views.decorators.http import require_http_methods
 from accounts.decorators import admin_required
 from accounts.models import Candidate, ActivityLog
 from assessments.models import Test, TestRegistration
-from analytics.services import get_candidate_cross_assessment_analytics
+from analytics.services import get_candidate_cross_assessment_analytics, sanitize_csv_cell
+from assessments.notifications import send_registration_notification
 
 
 @admin_required
@@ -406,6 +407,8 @@ def candidate_import(request):
                         )
                         if created:
                             registrations_created += 1
+                            # Send assessment registration notification safely (isolated SMTP errors)
+                            send_registration_notification(candidate, test, request=request)
                         else:
                             duplicates_skipped += 1
 
@@ -460,6 +463,7 @@ def candidate_import(request):
 def candidate_import_error_csv(request):
     """
     Download a CSV file containing rows that failed validation in the last import.
+    Guarded against spreadsheet formula injection.
     """
     errors = request.session.get('candidate_import_errors', [])
     if not errors:
@@ -472,6 +476,11 @@ def candidate_import_error_csv(request):
     writer = csv.writer(response)
     writer.writerow(['row_number', 'email', 'name', 'error_reason'])
     for err in errors:
-        writer.writerow([err['row'], err['email'], err['name'], err['reason']])
+        writer.writerow([
+            err['row'],
+            sanitize_csv_cell(err.get('email', '')),
+            sanitize_csv_cell(err.get('name', '')),
+            sanitize_csv_cell(err.get('reason', ''))
+        ])
 
     return response

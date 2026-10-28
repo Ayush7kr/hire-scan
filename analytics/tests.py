@@ -809,3 +809,35 @@ class AdvancedAnalyticsAndAutomatedReportTests(AnalyticsBaseTestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn('Export Filtered PDF', res.content.decode('utf-8'))
 
+    def test_dashboard_operational_indicators_present_and_accurate(self):
+        """Dashboard analytics returns operational indicators: upcoming, in_progress, completed, awaiting, failed."""
+        from assessments.models import NotificationLog
+        NotificationLog.objects.create(
+            candidate=self.cand1,
+            test=self.test1,
+            notification_type='registered',
+            recipient_email=self.cand1.email,
+            subject="Test Failure",
+            status='failed',
+            error_message="SMTP down"
+        )
+
+        analytics = get_dashboard_analytics()
+        self.assertIn('upcoming_assessments_count', analytics)
+        self.assertIn('in_progress_assessments_count', analytics)
+        self.assertIn('recently_completed_assessments_count', analytics)
+        self.assertIn('registrations_awaiting_count', analytics)
+        self.assertIn('failed_notifications_count', analytics)
+        self.assertEqual(analytics['failed_notifications_count'], 1)
+
+        # Test dashboard view rendering
+        res = self.admin_client.get(reverse('admin_dashboard'))
+        self.assertEqual(res.status_code, 200)
+        content = res.content.decode('utf-8')
+        self.assertIn('Upcoming Assessments', content)
+        self.assertIn('In-Progress Assessments', content)
+        self.assertIn('Recently Completed', content)
+        self.assertIn('Registrations Awaiting Completion', content)
+        self.assertIn('Notification Delivery Attention Required', content)
+
+

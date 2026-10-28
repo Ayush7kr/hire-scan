@@ -19,12 +19,13 @@ from django.utils.dateparse import parse_datetime
 
 from accounts.decorators import admin_required
 from accounts.models import Candidate, ActivityLog
-from assessments.models import Test, Question, TestRegistration
+from assessments.models import Test, Question, TestRegistration, NotificationLog
 from assessments.notifications import (
     send_registration_notification,
     send_assessment_available_notifications,
     send_assessment_cancelled_notifications,
 )
+from analytics.services import sanitize_csv_cell
 from attempts.models import TestAttempt
 
 
@@ -967,7 +968,12 @@ def question_import_error_csv(request):
     writer = csv.writer(response)
     writer.writerow(['row_number', 'question', 'topic', 'error_reason'])
     for err in errors:
-        writer.writerow([err['row'], err['question'], err['topic'], err['reason']])
+        writer.writerow([
+            err['row'],
+            sanitize_csv_cell(err.get('question', '')),
+            sanitize_csv_cell(err.get('topic', '')),
+            sanitize_csv_cell(err.get('reason', ''))
+        ])
 
     return response
 
@@ -1427,4 +1433,195 @@ def admin_attempt_detail(request, attempt_id):
         'return_querystring': return_querystring,
     }
     return render(request, 'admin_portal/tests/attempt_detail.html', context)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. NOTIFICATION DELIVERY MONITORING & RETRY
+# ─────────────────────────────────────────────────────────────────────────────
+
+@admin_required
+def notification_list(request):
+    """
+    Operational notification delivery monitor for administrators.
+    Displays dispatch logs, delivery statuses (sent/failed), safe error details,
+    and supports searching, filtering, and controlled retry.
+    """
+    status_filter = request.GET.get('status', '').strip().lower()
+    type_filter = request.GET.get('type', '').strip().lower()
+    search_query = request.GET.get('q', '').strip()
+
+    notifications_qs = NotificationLog.objects.select_related('candidate', 'test').order_by('-sent_at')
+
+    if status_filter in ['sent', 'failed']:
+        notifications_qs = notifications_qs.filter(status=status_filter)
+
+    if type_filter:
+        notifications_qs = notifications_qs.filter(notification_type=type_filter)
+
+    if search_query:
+        notifications_qs = notifications_qs.filter(
+            Q(recipient_email__icontains=search_query) |
+            Q(candidate__name__icontains=search_query) |
+            Q(test__test_name__icontains=search_query) |
+            Q(subject__icontains=search_query)
+        )
+
+    # Operational metrics
+    total_count = NotificationLog.objects.count()
+    sent_count = NotificationLog.objects.filter(status='sent').count()
+    failed_count = NotificationLog.objects.filter(status='failed').count()
+
+    paginator = Paginator(notifications_qs, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'admin_user': request.admin_user,
+        'page_obj': page_obj,
+        'status_filter': status_filter,
+        'type_filter': type_filter,
+        'search_query': search_query,
+        'total_count': total_count,
+        'sent_count': sent_count,
+        'failed_count': failed_count,
+        'type_choices': NotificationLog.TYPE_CHOICES,
+    }
+    return render(request, 'admin_portal/registrations/notification_list.html', context)
+
+
+@admin_required
+@require_http_methods(["POST"])
+def notification_retry(request, log_id):
+    """
+    Safely retry a failed notification delivery.
+    Enforces authorization, checks candidate/test validity, prevents duplicate
+    deliveries, sanitizes error logs, and audits retry operations.
+    """
+    import re
+    log = get_object_or_404(
+        NotificationLog.objects.select_related('candidate', 'test'),
+        notification_id=log_id
+    )
+
+    if log.status == 'sent':
+        messages.info(request, f"Notification to {log.recipient_email} has already been sent successfully.")
+        return redirect('notification_list')
+
+    # Anti-duplicate protection: check if a successful notification has already been delivered
+    already_sent = NotificationLog.objects.filter(
+        candidate=log.candidate,
+        test=log.test,
+        notification_type=log.notification_type,
+        status='sent'
+    ).exists()
+    if already_sent:
+        log.status = 'sent'
+        log.error_message = 'Superseded: A subsequent notification was successfully delivered.'
+        log.save(update_fields=['status', 'error_message'])
+        messages.info(request, f"A notification for this assessment has already been delivered to {log.recipient_email}. Status marked resolved.")
+        return redirect('notification_list')
+
+    candidate = log.candidate
+    test = log.test
+
+    if not candidate.is_active:
+        messages.error(request, f"Cannot retry: Candidate '{candidate.name}' ({candidate.email}) is currently deactivated.")
+        return redirect('notification_list')
+
+    if test.is_cancelled and log.notification_type != 'cancelled':
+        messages.error(request, f"Cannot retry: Assessment '{test.test_name}' has been cancelled.")
+        return redirect('notification_list')
+
+    # Attempt re-dispatch
+    try:
+        if log.notification_type == 'registered':
+            success, msg = send_registration_notification(candidate, test, request=request)
+        elif log.notification_type == 'available':
+            s_cnt, f_cnt = send_assessment_available_notifications(test, request=request)
+            success = s_cnt > 0 or f_cnt == 0
+            msg = "Dispatched" if success else "Failed to deliver"
+        elif log.notification_type == 'cancelled':
+            s_cnt, f_cnt = send_assessment_cancelled_notifications(test, request=request)
+            success = s_cnt > 0 or f_cnt == 0
+            msg = "Dispatched" if success else "Failed to deliver"
+        else:
+            from assessments.notifications import _format_datetime
+            from django.core.mail import send_mail
+            from django.conf import settings
+            from django.template.loader import render_to_string
+
+            start_str = _format_datetime(test.start_time)
+            end_str = _format_datetime(test.end_time)
+            notif_context = {
+                'candidate_name': candidate.name,
+                'notification_title': log.subject,
+                'lead_message': f"Update regarding your registered assessment '{test.test_name}'.",
+                'test_name': test.test_name,
+                'description': test.description,
+                'duration_minutes': test.duration_minutes,
+                'total_questions': test.total_questions,
+                'passing_marks': test.passing_marks,
+                'status_display': test.status_display,
+                'start_time_str': start_str,
+                'end_time_str': end_str,
+                'notice_title': 'Assessment Notification',
+                'notice_text': 'Please check your schedule and details before starting.',
+                'notice_type': 'info',
+                'cta_text': 'Go to Candidate Portal',
+                'cta_url': request.build_absolute_uri('/candidate/login/'),
+            }
+            html_message = render_to_string('emails/assessment_notification.html', notif_context)
+            send_mail(
+                subject=log.subject,
+                message=f"Assessment notice for {test.test_name}.\n\nLog in to the Candidate Portal to take your test.",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[candidate.email],
+                fail_silently=False,
+                html_message=html_message,
+            )
+            success = True
+            msg = "Sent successfully."
+
+        if success:
+            log.status = 'sent'
+            log.error_message = ''
+            log.sent_at = timezone.now()
+            log.save(update_fields=['status', 'error_message', 'sent_at'])
+
+            ActivityLog.objects.create(
+                admin=request.admin_user,
+                candidate=candidate,
+                activity_type='notification_retried',
+                activity_details=f"Retried {log.notification_type} notification for {log.recipient_email} on test '{test.test_name}': Success."
+            )
+            messages.success(request, f"Notification to {log.recipient_email} retried and delivered successfully.")
+        else:
+            safe_err = re.sub(r'(password|secret|key|token)[=:\s]+[^\s,;]+', r'\1: [REDACTED]', str(msg), flags=re.IGNORECASE)
+            log.error_message = safe_err
+            log.sent_at = timezone.now()
+            log.save(update_fields=['error_message', 'sent_at'])
+
+            ActivityLog.objects.create(
+                admin=request.admin_user,
+                candidate=candidate,
+                activity_type='notification_retried',
+                activity_details=f"Retried {log.notification_type} notification for {log.recipient_email} on test '{test.test_name}': Failed ({safe_err[:100]})."
+            )
+            messages.error(request, f"Retry attempt failed: {safe_err}")
+
+    except Exception as exc:
+        safe_err = re.sub(r'(password|secret|key|token)[=:\s]+[^\s,;]+', r'\1: [REDACTED]', str(exc), flags=re.IGNORECASE)
+        log.error_message = safe_err
+        log.sent_at = timezone.now()
+        log.save(update_fields=['error_message', 'sent_at'])
+
+        ActivityLog.objects.create(
+            admin=request.admin_user,
+            candidate=candidate,
+            activity_type='notification_retried',
+            activity_details=f"Retried {log.notification_type} notification for {log.recipient_email} on test '{test.test_name}': Failed ({safe_err[:100]})."
+        )
+        messages.error(request, f"Retry attempt failed: {safe_err}")
+
+    return redirect('notification_list')
 

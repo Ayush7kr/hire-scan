@@ -326,3 +326,45 @@ class CandidateCSVImportTests(TestCase):
         content = response.content.decode('utf-8')
         self.assertIn('row_number,email,name,error_reason', content)
         self.assertIn('bad-email', content)
+
+    def test_download_candidate_import_errors_csv_formula_injection_defense(self):
+        """Formula injection attempts in invalid CSV rows are sanitized with single quotes."""
+        csv_data = "email,name\n=calc|A0!0,=@SUM(1;2)\n"
+        csv_file = io.BytesIO(csv_data.encode('utf-8'))
+        csv_file.name = 'injection.csv'
+
+        self.client.post(reverse('candidate_import'), {
+            'test_id': str(self.test.test_id),
+            'csv_file': csv_file
+        })
+
+        response = self.client.get(reverse('candidate_import_error_csv'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        # Leading '=' must be prefixed with single quote
+        self.assertIn("'=calc|a0!0", content)
+        self.assertIn("'=@SUM(1;2)", content)
+
+    def test_candidate_import_triggers_registration_notification(self):
+        """Importing a new candidate creates a registration and logs a registration notification."""
+        from assessments.models import NotificationLog
+        from django.core import mail
+        mail.outbox.clear()
+
+        csv_data = "email,name\nnew.notif.candidate@test.local,Notification Cand\n"
+        csv_file = io.BytesIO(csv_data.encode('utf-8'))
+        csv_file.name = 'cand_notif.csv'
+
+        self.client.post(reverse('candidate_import'), {
+            'test_id': str(self.test.test_id),
+            'csv_file': csv_file
+        })
+
+        cand = Candidate.objects.filter(email='new.notif.candidate@test.local').first()
+        self.assertIsNotNone(cand)
+        self.assertTrue(NotificationLog.objects.filter(
+            candidate=cand,
+            test=self.test,
+            notification_type='registered'
+        ).exists())
+

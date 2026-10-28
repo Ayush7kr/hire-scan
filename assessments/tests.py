@@ -842,3 +842,139 @@ class AssessmentNotificationTests(TestCase):
         call_command('send_assessment_reminders', hours=5)
         self.assertEqual(len(mail.outbox), 1)
 
+
+class NotificationDeliveryMonitorTests(TestCase):
+    """Test suite for Notification Delivery Monitoring and Safe Retry Mechanisms."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = Admin.objects.create(name="Notification Admin", email="admin.notif@test.local")
+        self.admin.set_password("AdminPass123!")
+        self.admin.save()
+
+        self.client.post(reverse('admin_login'), {
+            'email': 'admin.notif@test.local',
+            'password': 'AdminPass123!'
+        })
+
+        self.candidate = Candidate.objects.create(
+            name="Charlie Candidate",
+            email="charlie.notif@test.local",
+            is_active=True
+        )
+        self.test = Test.objects.create(
+            test_name="Security Engineering Test",
+            duration_minutes=60,
+            total_questions=10,
+            passing_marks=6,
+            is_active=True
+        )
+        self.reg = TestRegistration.objects.create(candidate=self.candidate, test=self.test, status='registered')
+
+        self.failed_log = NotificationLog.objects.create(
+            candidate=self.candidate,
+            test=self.test,
+            notification_type='registered',
+            recipient_email=self.candidate.email,
+            subject="Test Registration Notice",
+            status='failed',
+            error_message="SMTP connection refused"
+        )
+        self.sent_log = NotificationLog.objects.create(
+            candidate=self.candidate,
+            test=self.test,
+            notification_type='reminder',
+            recipient_email=self.candidate.email,
+            subject="Test Reminder Notice",
+            status='sent'
+        )
+
+    def test_notification_list_unauthenticated_redirects(self):
+        """Unauthenticated requests to notification list redirect to admin login."""
+        anon = Client()
+        response = anon.get(reverse('notification_list'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('admin_login'), response.url)
+
+    def test_notification_list_view_renders_for_admin(self):
+        """Notification list displays delivery statuses, metrics, and logs."""
+        response = self.client.get(reverse('notification_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Notification Delivery Monitor')
+        self.assertContains(response, 'charlie.notif@test.local')
+        self.assertContains(response, 'Security Engineering Test')
+        self.assertContains(response, 'Failed')
+        self.assertContains(response, 'Sent')
+        self.assertEqual(response.context['total_count'], 2)
+        self.assertEqual(response.context['failed_count'], 1)
+        self.assertEqual(response.context['sent_count'], 1)
+
+    def test_notification_list_filter_by_status(self):
+        """Filter notifications by failed and sent delivery statuses."""
+        res_failed = self.client.get(reverse('notification_list'), {'status': 'failed'})
+        self.assertEqual(res_failed.status_code, 200)
+        self.assertContains(res_failed, 'SMTP connection refused')
+        self.assertNotContains(res_failed, 'Test Reminder Notice')
+
+        res_sent = self.client.get(reverse('notification_list'), {'status': 'sent'})
+        self.assertEqual(res_sent.status_code, 200)
+        self.assertContains(res_sent, 'Test Reminder Notice')
+        self.assertNotContains(res_sent, 'SMTP connection refused')
+
+    def test_notification_list_search_query(self):
+        """Search query filters by recipient email or test name."""
+        response = self.client.get(reverse('notification_list'), {'q': 'charlie'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'charlie.notif@test.local')
+
+    def test_notification_retry_successful(self):
+        """Retrying a failed notification dispatches email and updates log to sent."""
+        mail.outbox.clear()
+        response = self.client.post(reverse('notification_retry', kwargs={'log_id': self.failed_log.notification_id}))
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse('notification_list'))
+
+        self.failed_log.refresh_from_db()
+        self.assertEqual(self.failed_log.status, 'sent')
+        self.assertEqual(self.failed_log.error_message, '')
+
+        # Audit log created
+        self.assertTrue(ActivityLog.objects.filter(
+            admin=self.admin,
+            activity_type='notification_retried'
+        ).exists())
+
+    def test_notification_retry_already_sent_is_rejected(self):
+        """Retrying an already sent notification is idempotent and does not resend."""
+        mail.outbox.clear()
+        response = self.client.post(reverse('notification_retry', kwargs={'log_id': self.sent_log.notification_id}))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_notification_retry_inactive_candidate_rejected(self):
+        """Deactivated candidate notifications cannot be retried."""
+        self.candidate.is_active = False
+        self.candidate.save()
+
+        response = self.client.post(reverse('notification_retry', kwargs={'log_id': self.failed_log.notification_id}))
+        self.assertEqual(response.status_code, 302)
+        self.failed_log.refresh_from_db()
+        self.assertEqual(self.failed_log.status, 'failed')
+
+    def test_question_import_error_csv_formula_injection_defense(self):
+        """Question error CSV sanitizes cells containing formula trigger prefixes."""
+        session = self.client.session
+        session['question_import_errors'] = [
+            {'row': 2, 'question': '=SUM(A1:A10)', 'topic': '@Math', 'reason': '+Invalid format'}
+        ]
+        session.save()
+
+        response = self.client.get(reverse('question_import_error_csv'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        self.assertIn("row_number,question,topic,error_reason", content)
+        self.assertIn("'=SUM(A1:A10)", content)
+        self.assertIn("'@Math", content)
+        self.assertIn("'+Invalid format", content)
+
+

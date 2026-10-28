@@ -11,7 +11,7 @@ from django.db.models import Count, Avg, Min, Max, Q, F
 from django.utils import timezone
 
 from accounts.models import Candidate, ActivityLog
-from assessments.models import Test, Question, TestRegistration
+from assessments.models import Test, Question, TestRegistration, NotificationLog
 from attempts.models import TestAttempt, AttemptQuestion
 
 
@@ -174,6 +174,33 @@ def get_dashboard_analytics(filters=None):
         if total_registrations > 0 else 0.0
     )
 
+    # Operational Dashboard Indicators
+    now_dt = timezone.now()
+    upcoming_assessments_count = tests_qs.filter(
+        is_cancelled=False, is_active=True, start_time__gt=now_dt
+    ).count()
+
+    in_progress_assessments_count = tests_qs.filter(
+        is_cancelled=False, is_active=True
+    ).filter(
+        Q(start_time__isnull=True) | Q(start_time__lte=now_dt)
+    ).filter(
+        Q(end_time__isnull=True) | Q(end_time__gte=now_dt)
+    ).count()
+
+    recently_completed_assessments_count = tests_qs.filter(
+        is_cancelled=False
+    ).filter(
+        Q(end_time__isnull=False, end_time__lt=now_dt) |
+        (Q(is_active=False) & Q(registrations__attempt__status='completed'))
+    ).distinct().count()
+
+    registrations_awaiting_count = regs_qs.filter(
+        status='registered', attempt__isnull=True
+    ).count()
+
+    failed_notifications_count = NotificationLog.objects.filter(status='failed').count()
+
     # ─────────────────────────────────────────────────────────────
     # CHART 1: Attempts Over Time (Daily timeline)
     # ─────────────────────────────────────────────────────────────
@@ -269,6 +296,12 @@ def get_dashboard_analytics(filters=None):
         'avg_score': avg_score,
         'avg_percentage': avg_percentage,
         'completion_rate': completion_rate,
+        # Operational Indicators
+        'upcoming_assessments_count': upcoming_assessments_count,
+        'in_progress_assessments_count': in_progress_assessments_count,
+        'recently_completed_assessments_count': recently_completed_assessments_count,
+        'registrations_awaiting_count': registrations_awaiting_count,
+        'failed_notifications_count': failed_notifications_count,
         # Chart payloads
         'daily_labels': daily_labels,
         'daily_started': daily_started,

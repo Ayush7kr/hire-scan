@@ -16,6 +16,9 @@
     <a href="{% url 'registration_list' %}" class="sidebar-nav-item {% if active_nav == 'registrations' or not active_nav and request.resolver_match.url_name in 'registration_list,registration_create,registration_detail' %}active{% endif %}">
       <i class="bi bi-card-checklist"></i> Test Registrations
     </a>
+    <a href="{% url 'notification_list' %}" class="sidebar-nav-item {% if active_nav == 'notifications' or not active_nav and request.resolver_match.url_name in 'notification_list,notification_retry' %}active{% endif %}">
+      <i class="bi bi-bell"></i> Notifications
+    </a>
 
     <div class="sidebar-heading mt-3">Analytics & Reports</div>
     <a href="{% url 'analytics_test_summary' %}" class="sidebar-nav-item {% if active_nav == 'test_summary' or not active_nav and request.resolver_match.url_name in 'analytics_test_summary,analytics_test_detail' %}active{% endif %}">

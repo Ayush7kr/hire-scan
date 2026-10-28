@@ -93,6 +93,22 @@
         </div>
       </div>
 
+      {% if analytics.failed_notifications_count > 0 %}
+      <!-- Failed Notifications Alert Banner -->
+      <div class="alert alert-warning border-0 shadow-sm rounded-3 d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-2 mb-4 p-3" role="alert">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill fs-5 text-warning"></i>
+          <div>
+            <strong>Notification Delivery Attention Required:</strong>
+            <span class="ms-1">{{ analytics.failed_notifications_count }} email notification{{ analytics.failed_notifications_count|pluralize }} failed delivery.</span>
+          </div>
+        </div>
+        <a href="{% url 'notification_list' %}?status=failed" class="btn btn-warning btn-sm fw-semibold text-dark text-nowrap">
+          <i class="bi bi-arrow-clockwise me-1"></i> Review &amp; Retry
+        </a>
+      </div>
+      {% endif %}
+
       <!-- Key KPI Cards Row -->
       <div class="row g-3 mb-4">
         <!-- Pass Rate -->
@@ -146,39 +162,85 @@
         </div>
       </div>
 
-      <!-- Second Metric Row: Tests & Bank Health -->
+      <!-- Second Metric Row: Tests & Candidate Overview -->
       <div class="row g-3 mb-4">
-        <div class="col-6 col-md-2">
-          <div class="p-3 bg-white rounded-3 border shadow-sm text-center">
-            <div class="text-muted small">Total Candidates</div>
-            <div class="fs-4 fw-bold text-dark font-mono">{{ analytics.total_candidates }}</div>
-          </div>
-        </div>
-        <div class="col-6 col-md-2">
-          <div class="p-3 bg-white rounded-3 border shadow-sm text-center">
-            <div class="text-muted small">Total Assessments</div>
-            <div class="fs-4 fw-bold text-dark font-mono">{{ analytics.total_tests }}</div>
-          </div>
-        </div>
-        <div class="col-6 col-md-2">
-          <div class="p-3 bg-white rounded-3 border shadow-sm text-center">
-            <div class="text-muted small">Active Assessments</div>
-            <div class="fs-4 fw-bold text-success font-mono">{{ analytics.active_tests }}</div>
-          </div>
-        </div>
         <div class="col-6 col-md-3">
-          <div class="p-3 bg-white rounded-3 border shadow-sm text-center">
-            <div class="text-muted small">In-Progress Right Now</div>
-            <div class="fs-4 fw-bold text-warning font-mono">{{ analytics.in_progress_count }}</div>
-          </div>
-        </div>
-        <div class="col-6 col-md-3">
-          <div class="p-3 bg-white rounded-3 border shadow-sm text-center">
-            <div class="text-muted small">Bank Insufficiency Alert</div>
-            <div class="fs-4 fw-bold {% if insufficient_tests_count > 0 %}text-danger{% else %}text-muted{% endif %} font-mono">
-              {{ insufficient_tests_count }}
+          <a href="{% url 'candidate_list' %}" class="text-decoration-none d-block h-100">
+            <div class="p-3 bg-white rounded-3 border shadow-sm text-center h-100">
+              <div class="text-muted small">Total Candidates</div>
+              <div class="fs-4 fw-bold text-dark font-mono">{{ analytics.total_candidates }}</div>
+              <div class="text-secondary" style="font-size: 0.72rem;">Registered in system</div>
             </div>
-          </div>
+          </a>
+        </div>
+        <div class="col-6 col-md-3">
+          <a href="{% url 'test_list' %}" class="text-decoration-none d-block h-100">
+            <div class="p-3 bg-white rounded-3 border shadow-sm text-center h-100">
+              <div class="text-muted small">Total Assessments</div>
+              <div class="fs-4 fw-bold text-dark font-mono">{{ analytics.total_tests }}</div>
+              <div class="text-secondary" style="font-size: 0.72rem;">Configured tests</div>
+            </div>
+          </a>
+        </div>
+        <div class="col-6 col-md-3">
+          <a href="{% url 'test_list' %}?status=active" class="text-decoration-none d-block h-100">
+            <div class="p-3 bg-white rounded-3 border shadow-sm text-center h-100">
+              <div class="text-muted small">Active Assessments</div>
+              <div class="fs-4 fw-bold text-success font-mono">{{ analytics.active_tests }}</div>
+              <div class="text-secondary" style="font-size: 0.72rem;">Published</div>
+            </div>
+          </a>
+        </div>
+        <div class="col-6 col-md-3">
+          <a href="{% url 'test_list' %}" class="text-decoration-none d-block h-100">
+            <div class="p-3 bg-white rounded-3 border shadow-sm text-center h-100">
+              <div class="text-muted small">Bank Insufficiency Alert</div>
+              <div class="fs-4 fw-bold {% if insufficient_tests_count > 0 %}text-danger{% else %}text-muted{% endif %} font-mono">
+                {{ insufficient_tests_count }}
+              </div>
+              <div class="text-secondary" style="font-size: 0.72rem;">Below question quota</div>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <!-- Operational Status Indicators Strip -->
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+          <a href="{% url 'test_list' %}?status=upcoming" class="text-decoration-none d-block h-100">
+            <div class="p-3 bg-white rounded-3 border shadow-sm text-center h-100">
+              <div class="text-muted small">Upcoming Assessments</div>
+              <div class="fs-4 fw-bold text-primary font-mono">{{ analytics.upcoming_assessments_count }}</div>
+              <div class="text-secondary" style="font-size: 0.72rem;">Scheduled future window</div>
+            </div>
+          </a>
+        </div>
+        <div class="col-6 col-md-3">
+          <a href="{% url 'test_list' %}?status=in_progress" class="text-decoration-none d-block h-100">
+            <div class="p-3 bg-white rounded-3 border shadow-sm text-center h-100">
+              <div class="text-muted small">In-Progress Assessments</div>
+              <div class="fs-4 fw-bold text-warning font-mono">{{ analytics.in_progress_assessments_count }}</div>
+              <div class="text-secondary" style="font-size: 0.72rem;">Live attempt window</div>
+            </div>
+          </a>
+        </div>
+        <div class="col-6 col-md-3">
+          <a href="{% url 'test_list' %}?status=completed" class="text-decoration-none d-block h-100">
+            <div class="p-3 bg-white rounded-3 border shadow-sm text-center h-100">
+              <div class="text-muted small">Recently Completed</div>
+              <div class="fs-4 fw-bold text-success font-mono">{{ analytics.recently_completed_assessments_count }}</div>
+              <div class="text-secondary" style="font-size: 0.72rem;">Window elapsed</div>
+            </div>
+          </a>
+        </div>
+        <div class="col-6 col-md-3">
+          <a href="{% url 'registration_list' %}" class="text-decoration-none d-block h-100">
+            <div class="p-3 bg-white rounded-3 border shadow-sm text-center h-100">
+              <div class="text-muted small">Registrations Awaiting Completion</div>
+              <div class="fs-4 fw-bold text-info font-mono">{{ analytics.registrations_awaiting_count }}</div>
+              <div class="text-secondary" style="font-size: 0.72rem;">Pending attempts</div>
+            </div>
+          </a>
         </div>
       </div>
 
@@ -348,12 +410,18 @@
                             <i class="bi bi-person-check-fill text-primary"></i>
                           {% elif 'candidate' in act.activity_type %}
                             <i class="bi bi-people-fill text-success"></i>
+                          {% elif 'registration' in act.activity_type %}
+                            <i class="bi bi-card-checklist text-success"></i>
+                          {% elif 'notification' in act.activity_type %}
+                            <i class="bi bi-bell-fill text-info"></i>
                           {% elif 'ATTEMPT' in act.activity_type or 'attempt' in act.activity_type %}
                             <i class="bi bi-stopwatch-fill text-warning"></i>
                           {% elif 'otp' in act.activity_type %}
                             <i class="bi bi-key-fill text-info"></i>
                           {% elif 'test' in act.activity_type %}
                             <i class="bi bi-journal-check text-primary"></i>
+                          {% elif 'unauthorized' in act.activity_type %}
+                            <i class="bi bi-shield-slash-fill text-danger"></i>
                           {% else %}
                             <i class="bi bi-activity text-secondary"></i>
                           {% endif %}
