@@ -45,16 +45,22 @@ Once authenticated, administrators land on the **Executive Dashboard**, providin
 ![Admin Executive Dashboard](screenshots/05_admin_dashboard.png)
 
 ### Dashboard Components
-1. **Executive KPI Cards:**
-   - **Active Tests:** Real-time tally of examinations currently open for candidate attempts.
-   - **Total Candidates:** Number of examinees registered in the system roster.
-   - **Test Registrations:** Total assessment assignments across all tests.
-   - **Completed Attempts:** Evaluated candidate submissions ready for review.
-2. **Independent Audit Activity Stream:**
+1. **Executive KPI Cards & Pass Rates:**
+   - **Overall Pass Rate:** Real-time percentage of finalized examinees who achieved minimum passing scores.
+   - **Average Score & Raw Marks:** Authoritative cohort average percentage and mean points.
+   - **Finalized Attempts:** Total submissions (manual and auto-finalized timeouts).
+   - **Funnel Completion:** Percentage of assigned candidate registrations that reached finalization.
+2. **Operational Status Indicators:**
+   - **Upcoming Assessments:** Count of active assessments scheduled for future windows, linking directly to `/admin/tests/?status=upcoming`.
+   - **In-Progress Assessments:** Count of assessments currently within their open window, linking to `/admin/tests/?status=in_progress`.
+   - **Recently Completed Assessments:** Count of closed assessments, linking to `/admin/tests/?status=completed`.
+   - **Registrations Awaiting Completion:** Count of candidates registered who have not yet started their attempt, linking to `/admin/registrations/`.
+   - **Failed Notification Deliveries:** Prominent warning banner and status indicator alerting administrators when email dispatches encounter SMTP or network failures, linking directly to `/admin/registrations/notifications/?status=failed`.
+3. **Independent Audit Activity Stream:**
    - Positioned on the right panel, this container has a fixed height with an independent vertical scrollbar.
-   - Captures real-time actions: Candidate imports, test status toggles, registration updates, and evaluation finalizations.
+   - Captures real-time actions: Candidate imports, test status toggles, registration updates, notification dispatches, retries, and unauthorized access attempts.
    - Avoids page-lengthening sprawl and lets administrators audit historical activities without scrolling away from primary metrics.
-3. **Quick Navigation Shortcuts:** One-click links to create new tests, import candidates, register examinees, or download performance reports.
+4. **Quick Navigation Shortcuts:** One-click links to create new tests, import candidates, register examinees, or download performance reports.
 
 ---
 
@@ -186,6 +192,14 @@ Administrators can assign entire cohorts of candidates to an assessment in a sin
    - **Created:** Reports total registrations successfully added.
    - **Already Registered:** Identifies candidates who were already registered for the test.
    - **Rejected:** Reports inactive or ineligible candidate selections with clear explanations.
+
+### 6.3 Notification Delivery Monitoring & Safe Retries
+The Notification Delivery Monitor (`/admin/registrations/notifications/`) logs every candidate email dispatch:
+- **Delivery Status Tracking:** Distinct visual badges for **Sent** (green) and **Failed** (red) email attempts.
+- **Credential & Secret Redaction:** Failure error messages sanitize SMTP passwords or authorization tokens to ensure sensitive infrastructure credentials are never exposed in administrative logs or UI tables.
+- **Controlled, Idempotent Retries:** For failed dispatches, administrators can trigger a secure, CSRF-protected retry (`POST /admin/registrations/notifications/<log_id>/retry/`).
+- **Deduplication Safeguard:** Before sending, the engine verifies that no subsequent notification of the same type has succeeded for this candidate and test, preventing duplicate emails.
+- **Registration Isolation:** Network or SMTP delivery failures never crash or corrupt underlying assessment registrations.
 
 ---
 
