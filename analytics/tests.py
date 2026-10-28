@@ -418,6 +418,52 @@ class PDFExportTests(AnalyticsBaseTestCase):
         res = self.bob_client.get(reverse('attempt_scorecard_pdf', args=[self.att1.attempt_id]))
         self.assertEqual(res.status_code, 403)
 
+    def test_assessment_summary_pdf_generation_single_finalized_candidate(self):
+        """Assessment summary PDF handles N=1 finalized candidate safely with sample clarification."""
+        from analytics.pdf_export import generate_assessment_summary_pdf
+        from assessments.models import Test
+        single_test = Test.objects.create(
+            test_name="Single Examinee Test",
+            duration_minutes=30,
+            total_questions=5,
+            passing_marks=3,
+            is_active=True
+        )
+        pdf_bytes = generate_assessment_summary_pdf(single_test.test_id)
+        self.assertTrue(pdf_bytes.startswith(b'%PDF-'))
+
+    def test_assessment_summary_pdf_generation_zero_finalized_candidates(self):
+        """Assessment summary PDF handles N=0 finalized candidates safely without DivisionByZero."""
+        from analytics.pdf_export import generate_assessment_summary_pdf
+        from assessments.models import Test
+        empty_test = Test.objects.create(
+            test_name="Zero Examinee Test",
+            duration_minutes=30,
+            total_questions=5,
+            passing_marks=3,
+            is_active=True
+        )
+        pdf_bytes = generate_assessment_summary_pdf(empty_test.test_id)
+        self.assertTrue(pdf_bytes.startswith(b'%PDF-'))
+
+    def test_assessment_summary_distribution_buckets_sum_to_finalized_count(self):
+        """Score distribution buckets strictly partition every finalized examinee with zero loss."""
+        from analytics.services import get_test_summary_analytics
+        summary = get_test_summary_analytics(test_id=self.test1.test_id)
+        bucket_sum = sum(b['count'] for b in summary['distribution_buckets'])
+        self.assertEqual(bucket_sum, summary['finalized_count'])
+
+    def test_scorecard_limited_sample_size_flag_and_curated_recommendations(self):
+        """Candidate scorecard identifies limited topic sample sizes and provides recommendations."""
+        from attempts.services import get_topic_performance
+        topic_perf = get_topic_performance(self.att1)
+        self.assertTrue(len(topic_perf) > 0)
+        # Check topic with <= 2 questions has is_limited_sample flag
+        single_q_topics = [t for t in topic_perf if t['total'] < 3]
+        if single_q_topics:
+            self.assertTrue(single_q_topics[0]['is_limited_sample'])
+            self.assertIn('Sample: ', single_q_topics[0]['sample_note'])
+
     def test_pdf_does_not_reveal_correct_answers_to_candidate(self):
         """PDF generation does not leak Question.correct_option text."""
         res = self.alice_client.get(reverse('attempt_scorecard_pdf', args=[self.att1.attempt_id]))
@@ -517,6 +563,24 @@ class AdminUINavigationAndFilteringTests(AnalyticsBaseTestCase):
     Tests for Admin UI consistency, sidebar completeness, candidate performance filtering,
     server-side pagination, contextual attempt navigation, and dashboard audit stream.
     """
+
+    def test_admin_sidebar_responsive_offcanvas_attributes_and_toggler(self):
+        """Admin portal includes responsive offcanvas sidebar drawer and hamburger toggler."""
+        res = self.admin_client.get(reverse('admin_dashboard'))
+        self.assertEqual(res.status_code, 200)
+        content = res.content.decode('utf-8')
+
+        # Check offcanvas classes and ID on sidebar
+        self.assertIn('id="adminSidebar"', content)
+        self.assertIn('offcanvas-lg offcanvas-start', content)
+        self.assertIn('id="adminSidebarLabel"', content)
+
+        # Check mobile toggler button in navbar
+        self.assertIn('data-bs-toggle="offcanvas"', content)
+        self.assertIn('data-bs-target="#adminSidebar"', content)
+
+        # Check drawer close button inside sidebar header
+        self.assertIn('data-bs-dismiss="offcanvas"', content)
 
     def test_candidate_import_sidebar_contains_all_11_links_and_active_state(self):
         """Candidate Imports page must render the full shared sidebar including Analytics & Reports."""

@@ -399,11 +399,21 @@ def get_test_summary_analytics(test_id=None, filters=None):
             score_range = 0
             std_dev = 0.0
 
-        # Score percentage distribution buckets
-        b_above_90 = finalized.filter(percentage__gte=90.0).count()
-        b_75_89 = finalized.filter(percentage__gte=75.0, percentage__lt=90.0).count()
-        b_50_74 = finalized.filter(percentage__gte=50.0, percentage__lt=75.0).count()
-        b_below_50 = finalized.filter(percentage__lt=50.0).count()
+        # Score percentage distribution buckets - strictly partitioned so every finalized examinee belongs to exactly one bracket
+        b_above_90 = 0
+        b_75_89 = 0
+        b_50_74 = 0
+        b_below_50 = 0
+        for a in finalized:
+            pct = float(a.percentage) if a.percentage is not None else 0.0
+            if pct >= 90.0:
+                b_above_90 += 1
+            elif pct >= 75.0:
+                b_75_89 += 1
+            elif pct >= 50.0:
+                b_50_74 += 1
+            else:
+                b_below_50 += 1
 
         distribution_buckets = [
             {'label': 'Excellent (90–100%)', 'count': b_above_90, 'pct': round((b_above_90 / finalized_count) * 100, 1) if finalized_count > 0 else 0.0, 'color': 'success'},

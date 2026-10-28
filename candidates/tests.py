@@ -345,6 +345,73 @@ class CandidateCSVImportTests(TestCase):
         self.assertIn("'=calc|a0!0", content)
         self.assertIn("'=@SUM(1;2)", content)
 
+    def test_candidate_import_empty_file_rejected(self):
+        """Completely empty file (0 bytes) is rejected with clear error message."""
+        csv_file = io.BytesIO(b"")
+        csv_file.name = 'empty.csv'
+
+        response = self.client.post(reverse('candidate_import'), {
+            'test_id': str(self.test.test_id),
+            'csv_file': csv_file
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'The uploaded CSV file is empty.')
+
+    def test_candidate_import_whitespace_only_file_rejected(self):
+        """File with only whitespace and empty lines is rejected as empty."""
+        csv_file = io.BytesIO(b"   \n\n\r\n   ")
+        csv_file.name = 'whitespace.csv'
+
+        response = self.client.post(reverse('candidate_import'), {
+            'test_id': str(self.test.test_id),
+            'csv_file': csv_file
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'The uploaded CSV file is empty.')
+
+    def test_candidate_import_header_only_file_warns_no_data(self):
+        """CSV file with valid headers but no candidate data rows displays clear warning."""
+        csv_data = "email,name\n"
+        csv_file = io.BytesIO(csv_data.encode('utf-8'))
+        csv_file.name = 'header_only.csv'
+
+        response = self.client.post(reverse('candidate_import'), {
+            'test_id': str(self.test.test_id),
+            'csv_file': csv_file
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'contains headers but no candidate data rows')
+
+    def test_candidate_import_utf8_bom_and_casing_and_spaces_handled(self):
+        """Headers with UTF-8 BOM, casing variations, and extra whitespace parse successfully."""
+        # \ufeff is UTF-8 BOM
+        csv_data = "\ufeff  EMAIL  ,  Name  \nCandidate.BOM@test.local,Bom User\n"
+        csv_file = io.BytesIO(csv_data.encode('utf-8'))
+        csv_file.name = 'bom_test.csv'
+
+        response = self.client.post(reverse('candidate_import'), {
+            'test_id': str(self.test.test_id),
+            'csv_file': csv_file
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Candidate.objects.filter(email='candidate.bom@test.local').exists())
+
+    def test_candidate_import_malformed_row_missing_columns(self):
+        """Malformed row missing required columns is rejected with row-level error without crash."""
+        csv_data = "email,name\nonlyonevalue_no_comma\nvalid.after@test.local,Valid User\n"
+        csv_file = io.BytesIO(csv_data.encode('utf-8'))
+        csv_file.name = 'malformed.csv'
+
+        response = self.client.post(reverse('candidate_import'), {
+            'test_id': str(self.test.test_id),
+            'csv_file': csv_file
+        })
+        self.assertEqual(response.status_code, 200)
+        # Valid user was still created
+        self.assertTrue(Candidate.objects.filter(email='valid.after@test.local').exists())
+        # Error report contains malformed row reason
+        self.assertContains(response, 'Row is missing')
+
     def test_candidate_import_triggers_registration_notification(self):
         """Importing a new candidate creates a registration and logs a registration notification."""
         from assessments.models import NotificationLog

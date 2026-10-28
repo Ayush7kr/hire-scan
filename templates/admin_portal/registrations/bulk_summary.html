@@ -42,6 +42,20 @@
         </div>
       </div>
 
+      {% if summary.created_count == 0 and summary.already_registered_count > 0 %}
+      <div class="alert alert-info border-info-subtle shadow-sm mb-4" role="alert">
+        <div class="d-flex align-items-center">
+          <i class="bi bi-info-circle-fill fs-4 text-info me-3"></i>
+          <div>
+            <h6 class="alert-heading fw-bold mb-1">0 New Registrations Created — Duplicate Registrations Prevented</h6>
+            <div class="small">
+              All <strong>{{ summary.already_registered_count }}</strong> selected candidate(s) were already registered for <strong>{{ summary.test_name }}</strong>. Existing registrations were preserved, and duplicate records were prevented.
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       <!-- Metric KPI Cards -->
       <div class="row g-3 mb-4">
         <div class="col-sm-6 col-lg-3">
@@ -138,7 +152,8 @@
           </div>
           {% else %}
           <div class="p-4 text-center text-muted small">
-            No new registrations created in this operation.
+            <i class="bi bi-shield-check text-muted fs-4 d-block mb-1"></i>
+            No new registrations created in this operation. All eligible candidates were already registered for this assessment.
           </div>
           {% endif %}
         </div>
@@ -215,6 +230,46 @@
                   <td>
                     <span class="text-muted small">
                       <i class="bi bi-info-circle me-1"></i> {{ item.reason }}
+                    </span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Other Registration Failures -->
+      {% if summary.failed_candidates %}
+      <div class="card border-0 shadow-sm rounded-3 mb-4">
+        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+          <h6 class="fw-bold mb-0 text-danger">
+            <i class="bi bi-exclamation-octagon-fill me-2"></i>Registration System Errors ({{ summary.failed_count }})
+          </h6>
+          <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+            Execution Conflict
+          </span>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-4">#</th>
+                  <th>Candidate Identifier</th>
+                  <th>Error Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in summary.failed_candidates %}
+                <tr>
+                  <td class="ps-4 text-muted small">{{ forloop.counter }}</td>
+                  <td class="fw-semibold text-danger">{{ item.identifier }}</td>
+                  <td>
+                    <span class="text-muted small">
+                      <i class="bi bi-x-circle me-1"></i> {{ item.reason }}
                     </span>
                   </td>
                 </tr>

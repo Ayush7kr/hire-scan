@@ -683,6 +683,93 @@ class BulkRegistrationSummaryTests(TestCase):
         self.assertIn(reverse('registration_list'), subsequent_response.url)
 
 
+    def test_bulk_registration_consecutive_same_batch_reports_zero_new_with_clear_summary(self):
+        """
+        Registering the same candidate batch more than once correctly reports 0 new registrations,
+        identifies all candidates as already registered (duplicate prevention), and preserves
+        clear feedback in both UI summary and ActivityLog.
+        """
+        from accounts.models import ActivityLog
+        candidates = [
+            Candidate.objects.create(name=f"Batch Cand {i}", email=f"batch{i}@test.local", is_active=True)
+            for i in range(10)
+        ]
+        cand_ids = [str(c.candidate_id) for c in candidates]
+
+        dedicated_test = Test.objects.create(
+            test_name="Repeat Batch Test",
+            duration_minutes=30,
+            total_questions=5,
+            passing_marks=3,
+            is_active=True
+        )
+
+        # First run: all 10 registered
+        res1 = self.client.post(reverse('registration_create'), {
+            'mode': 'multiple',
+            'test_id': str(dedicated_test.test_id),
+            'candidate_ids': cand_ids,
+        }, follow=True)
+        self.assertEqual(res1.status_code, 200)
+        self.assertEqual(TestRegistration.objects.filter(test=dedicated_test).count(), 10)
+        self.assertEqual(res1.context['summary']['created_count'], 10)
+        self.assertEqual(res1.context['summary']['already_registered_count'], 0)
+
+        # Second run: same 10 candidates selected again
+        res2 = self.client.post(reverse('registration_create'), {
+            'mode': 'multiple',
+            'test_id': str(dedicated_test.test_id),
+            'candidate_ids': cand_ids,
+        }, follow=True)
+        self.assertEqual(res2.status_code, 200)
+        # Total registrations in DB remains 10 (no duplicates created)
+        self.assertEqual(TestRegistration.objects.filter(test=dedicated_test).count(), 10)
+
+        # Summary explicitly reflects 0 new registrations and 10 already registered
+        summary2 = res2.context['summary']
+        self.assertEqual(summary2['created_count'], 0)
+        self.assertEqual(summary2['already_registered_count'], 10)
+        self.assertEqual(summary2['rejected_count'], 0)
+
+        # UI feedback shows duplicate prevention and zero new registrations message
+        content = res2.content.decode('utf-8')
+        self.assertIn('0 New Registrations Created', content)
+        self.assertIn('Duplicate Registrations Prevented', content)
+
+        # ActivityLog records the batch operation with duplicate prevention details
+        last_log = ActivityLog.objects.filter(activity_type='bulk_candidates_registered').first()
+        self.assertIsNotNone(last_log)
+        self.assertIn('0 newly registered', last_log.activity_details)
+        self.assertIn('10 already registered', last_log.activity_details)
+
+    def test_bulk_registration_mixed_batch_atomic_savepoints(self):
+        """
+        A mixed batch containing already-registered, ineligible (inactive), and eligible candidates
+        registers the eligible candidates without failing or duplicating existing registrations.
+        """
+        cand_eligible = Candidate.objects.create(name="Eligible Cand", email="eligible@test.local", is_active=True)
+        cand_already = Candidate.objects.create(name="Prior Cand", email="prior@test.local", is_active=True)
+        TestRegistration.objects.create(candidate=cand_already, test=self.test, status='registered')
+        cand_inactive = Candidate.objects.create(name="Inactive Cand", email="inactive2@test.local", is_active=False)
+
+        res = self.client.post(reverse('registration_create'), {
+            'mode': 'multiple',
+            'test_id': str(self.test.test_id),
+            'candidate_ids': [
+                str(cand_eligible.candidate_id),
+                str(cand_already.candidate_id),
+                str(cand_inactive.candidate_id),
+            ]
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+
+        summary = res.context['summary']
+        self.assertEqual(summary['created_count'], 1)
+        self.assertEqual(summary['already_registered_count'], 1)
+        self.assertEqual(summary['rejected_count'], 1)
+        self.assertTrue(TestRegistration.objects.filter(candidate=cand_eligible, test=self.test).exists())
+
+
 class AssessmentNotificationTests(TestCase):
     """Test suite for assessment email notifications, anti-duplication, and reminders."""
 

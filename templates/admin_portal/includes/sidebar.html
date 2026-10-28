@@ -1,4 +1,12 @@
-<aside class="admin-sidebar">
+<aside class="admin-sidebar offcanvas-lg offcanvas-start" id="adminSidebar" tabindex="-1" aria-labelledby="adminSidebarLabel">
+  <!-- Mobile Drawer Header -->
+  <div class="offcanvas-header d-lg-none d-flex justify-content-between align-items-center pb-2 mb-2 border-bottom border-secondary border-opacity-25">
+    <h5 class="offcanvas-title text-white fs-6 fw-bold mb-0" id="adminSidebarLabel">
+      <i class="bi bi-shield-check text-primary me-1"></i> Admin Menu
+    </h5>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#adminSidebar" aria-label="Close navigation drawer"></button>
+  </div>
+
   <div class="sidebar-heading">Management</div>
   <nav class="d-flex flex-column">
     <a href="{% url 'admin_dashboard' %}" class="sidebar-nav-item {% if active_nav == 'dashboard' or not active_nav and request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">

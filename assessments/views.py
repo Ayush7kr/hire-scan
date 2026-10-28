@@ -1131,10 +1131,11 @@ def registration_create(request):
                             unique_to_register.append(cand)
 
                     created_candidates = []
+                    failed = []
                     if unique_to_register:
-                        try:
-                            with transaction.atomic():
-                                for cand in unique_to_register:
+                        for cand in unique_to_register:
+                            try:
+                                with transaction.atomic():
                                     TestRegistration.objects.create(
                                         candidate=cand,
                                         test=test,
@@ -1146,15 +1147,27 @@ def registration_create(request):
                                         activity_type='candidate_registered',
                                         activity_details=f"Admin registered {cand.email} for test '{test.test_name}' (bulk registration)."
                                     )
-                                    created_candidates.append(cand)
-                        except IntegrityError:
-                            errors['general'] = "A concurrent registration conflict occurred. Please review existing registrations."
+                                created_candidates.append(cand)
+                            except IntegrityError:
+                                # Concurrent registration collision: check if candidate is already registered
+                                if TestRegistration.objects.filter(candidate=cand, test=test).exists():
+                                    if cand not in already_registered:
+                                        already_registered.append(cand)
+                                else:
+                                    failed.append((f"{cand.name} ({cand.email})", "Database registration conflict"))
+                            except Exception as exc:
+                                failed.append((f"{cand.name} ({cand.email})", f"Registration error: {str(exc)}"))
 
                     # Transparent reporting
                     if created_candidates:
                         messages.success(
                             request,
                             f"Successfully registered {len(created_candidates)} candidate(s) for '{test.test_name}'."
+                        )
+                    elif already_registered and not rejected and not failed:
+                        messages.info(
+                            request,
+                            f"0 new registrations created: All {len(already_registered)} selected candidate(s) were already registered for '{test.test_name}'. Duplicate registrations were prevented."
                         )
 
                     if already_registered:
@@ -1173,6 +1186,14 @@ def registration_create(request):
                             f"{len(rejected)} candidate selection(s) were rejected: {rej_msgs}{more_rej}."
                         )
 
+                    if failed:
+                        fail_msgs = "; ".join([f"{name}: {reason}" for name, reason in failed[:5]])
+                        more_fail = f" and {len(failed)-5} more" if len(failed) > 5 else ""
+                        messages.error(
+                            request,
+                            f"{len(failed)} candidate registration(s) failed: {fail_msgs}{more_fail}."
+                        )
+
                     # Structured bulk summary
                     summary_data = {
                         'test_name': test.test_name,
@@ -1184,7 +1205,9 @@ def registration_create(request):
                         'already_registered_candidates': [{'name': c.name, 'email': c.email} for c in already_registered],
                         'rejected_count': len(rejected),
                         'rejected_candidates': [{'identifier': name, 'reason': reason} for name, reason in rejected],
-                        'error_count': 1 if errors.get('general') else 0,
+                        'failed_count': len(failed),
+                        'failed_candidates': [{'identifier': name, 'reason': reason} for name, reason in failed],
+                        'error_count': len(failed) + (1 if errors.get('general') else 0),
                         'general_error': errors.get('general', ''),
                     }
                     request.session['bulk_registration_summary'] = summary_data
@@ -1193,8 +1216,9 @@ def registration_create(request):
                         admin=request.admin_user,
                         activity_type='bulk_candidates_registered',
                         activity_details=(
-                            f"Admin registered {len(created_candidates)} candidate(s) for test '{test.test_name}' "
-                            f"({len(already_registered)} already registered, {len(rejected)} rejected)."
+                            f"Admin processed bulk registration for test '{test.test_name}': "
+                            f"{len(created_candidates)} newly registered, {len(already_registered)} already registered (duplicates prevented), "
+                            f"{len(rejected)} rejected (ineligible), {len(failed)} failed."
                         )
                     )
 
@@ -1202,13 +1226,7 @@ def registration_create(request):
                     for cand in created_candidates:
                         send_registration_notification(cand, test, request=request)
 
-                    if created_candidates and not errors.get('general'):
-                        return redirect('registration_bulk_summary')
-                    elif not created_candidates and not errors.get('general'):
-                        if already_registered or rejected:
-                            return redirect('registration_bulk_summary')
-                        else:
-                            errors['general'] = "No registrations created."
+                    return redirect('registration_bulk_summary')
                 elif rejected:
                     rej_msgs = "; ".join([f"{name}: {reason}" for name, reason in rejected[:5]])
                     errors['general'] = f"Selected candidate(s) rejected: {rej_msgs}."

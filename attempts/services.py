@@ -231,7 +231,7 @@ def evaluate_attempt(attempt, submission_reason='manual'):
 def get_topic_performance(attempt):
     """
     Aggregate topic-wise performance for an evaluated attempt.
-    Returns a list of dicts with topic metrics and improvement suggestions.
+    Returns a list of dicts with topic metrics, sample size indicators, and improvement suggestions.
     """
     attempt_questions = (
         attempt.attempt_questions
@@ -259,12 +259,16 @@ def get_topic_performance(attempt):
             topics_map[topic]['correct'] += 1
         elif aq.selected_option is None:
             topics_map[topic]['unanswered'] += 1
-            if q.suggestions:
+            if q.suggestions and q.suggestions.strip():
                 topics_map[topic]['suggestions'].add(q.suggestions.strip())
+            else:
+                topics_map[topic]['suggestions'].add(f"Review core concepts and problem solving in {topic}.")
         else:
             topics_map[topic]['incorrect'] += 1
-            if q.suggestions:
+            if q.suggestions and q.suggestions.strip():
                 topics_map[topic]['suggestions'].add(q.suggestions.strip())
+            else:
+                topics_map[topic]['suggestions'].add(f"Review core concepts and problem solving in {topic}.")
 
     topic_results = []
     for topic_data in topics_map.values():
@@ -282,6 +286,20 @@ def get_topic_performance(attempt):
             level = 'Needs Work'
             badge_class = 'bg-danger-subtle text-danger border border-danger-subtle'
 
+        is_limited_sample = (total < 3)
+        if total == 1:
+            sample_note = "Sample: 1 question (preliminary signal)"
+            sample_warning = "Limited topic sample size (1 question) — single-item assessment, not definitive mastery."
+            level_display = f"{level}*"
+        elif total == 2:
+            sample_note = "Sample: 2 questions"
+            sample_warning = "Limited topic sample size (2 questions) — preliminary assessment."
+            level_display = f"{level}*"
+        else:
+            sample_note = f"Sample: {total} questions"
+            sample_warning = ""
+            level_display = level
+
         topic_results.append({
             'topic': topic_data['topic'],
             'total': total,
@@ -290,6 +308,10 @@ def get_topic_performance(attempt):
             'unanswered': topic_data['unanswered'],
             'accuracy': accuracy,
             'level': level,
+            'level_display': level_display,
+            'is_limited_sample': is_limited_sample,
+            'sample_note': sample_note,
+            'sample_warning': sample_warning,
             'badge_class': badge_class,
             'suggestions': sorted(list(topic_data['suggestions'])),
         })

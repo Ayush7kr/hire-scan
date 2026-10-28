@@ -288,15 +288,23 @@ def candidate_import(request):
             except UnicodeDecodeError:
                 decoded_file = file_data.decode('latin-1')
 
-            reader = csv.reader(io.StringIO(decoded_file))
-            try:
-                headers = next(reader)
-            except StopIteration:
+            if not decoded_file.strip():
                 messages.error(request, 'The uploaded CSV file is empty.')
                 return render(request, 'admin_portal/candidates/import.html', {'tests': tests})
 
-            # Normalize headers
-            headers_clean = [h.strip().lower() for h in headers]
+            reader = csv.reader(io.StringIO(decoded_file))
+            headers = None
+            for raw_row in reader:
+                if any(cell.strip() for cell in raw_row):
+                    headers = raw_row
+                    break
+
+            if headers is None:
+                messages.error(request, 'The uploaded CSV file is empty.')
+                return render(request, 'admin_portal/candidates/import.html', {'tests': tests})
+
+            # Normalize headers: trim whitespace, quotes, and lowercase
+            headers_clean = [h.strip().strip('"\'').lower() for h in headers]
 
             # Verify required columns: 'email' and 'name' are mandatory
             if 'email' not in headers_clean or 'name' not in headers_clean:
@@ -325,8 +333,11 @@ def candidate_import(request):
                 total_rows += 1
 
                 # Extract fields safely
-                email = row[col_map['email']].strip().lower() if col_map.get('email') is not None and col_map['email'] < len(row) else ''
-                name = row[col_map['name']].strip() if col_map.get('name') is not None and col_map['name'] < len(row) else ''
+                email_idx = col_map['email']
+                name_idx = col_map['name']
+
+                email = row[email_idx].strip().lower() if email_idx < len(row) else ''
+                name = row[name_idx].strip() if name_idx < len(row) else ''
                 whatsapp = row[col_map['whatsapp_number']].strip() if col_map.get('whatsapp_number') is not None and col_map['whatsapp_number'] < len(row) else ''
                 college = row[col_map['college_name_address']].strip() if col_map.get('college_name_address') is not None and col_map['college_name_address'] < len(row) else ''
                 qualification = row[col_map['qualification']].strip() if col_map.get('qualification') is not None and col_map['qualification'] < len(row) else ''
@@ -340,7 +351,9 @@ def candidate_import(request):
                 # Row validations
                 row_error_reasons = []
 
-                if not email:
+                if email_idx >= len(row):
+                    row_error_reasons.append("Row is missing the email column")
+                elif not email:
                     row_error_reasons.append("Email is missing")
                 else:
                     try:
@@ -348,7 +361,9 @@ def candidate_import(request):
                     except ValidationError:
                         row_error_reasons.append("Invalid email format")
 
-                if not name:
+                if name_idx >= len(row):
+                    row_error_reasons.append("Row is missing the name column")
+                elif not name:
                     row_error_reasons.append("Name is missing")
 
                 # In-file duplicate detection
@@ -419,6 +434,23 @@ def candidate_import(request):
                         'name': name,
                         'reason': f"Database save error: {str(ex)}"
                     })
+
+            if total_rows == 0:
+                messages.warning(
+                    request,
+                    "The uploaded CSV file contains headers but no candidate data rows."
+                )
+                summary = {
+                    'test_name': test.test_name,
+                    'total_rows': 0,
+                    'candidates_created': 0,
+                    'candidates_reused': 0,
+                    'registrations_created': 0,
+                    'duplicates_skipped': 0,
+                    'invalid_rows': 0,
+                    'errors': [],
+                }
+                return render(request, 'admin_portal/candidates/import.html', {'tests': tests, 'summary': summary})
 
             # Store errors in session for downloadable error report
             request.session['candidate_import_errors'] = row_errors

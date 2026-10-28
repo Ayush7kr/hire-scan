@@ -195,6 +195,11 @@
                       <span class="badge {{ topic.badge_class }} px-2 py-1">
                         {{ topic.level }}
                       </span>
+                      {% if topic.is_limited_sample %}
+                        <div class="text-muted mt-1" style="font-size: 0.72rem;">
+                          <i class="bi bi-info-circle me-1"></i>{{ topic.sample_note }}
+                        </div>
+                      {% endif %}
                     </td>
                   </tr>
                 {% empty %}

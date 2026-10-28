@@ -266,4 +266,32 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
   }
+
+  // ──────────────── Admin Sidebar Offcanvas Navigation ────────────────
+  const adminSidebarEl = document.getElementById('adminSidebar');
+  if (adminSidebarEl && window.bootstrap && window.bootstrap.Offcanvas) {
+    const getSidebarOffcanvas = () => bootstrap.Offcanvas.getOrCreateInstance(adminSidebarEl);
+
+    // Auto-close drawer when a navigation link is clicked on narrow screens
+    adminSidebarEl.querySelectorAll('.sidebar-nav-item').forEach(link => {
+      link.addEventListener('click', function () {
+        if (window.innerWidth < 992) {
+          const instance = getSidebarOffcanvas();
+          if (instance) {
+            instance.hide();
+          }
+        }
+      });
+    });
+
+    // Ensure Escape key closes sidebar if open on narrow screens
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && window.innerWidth < 992 && adminSidebarEl.classList.contains('show')) {
+        const instance = getSidebarOffcanvas();
+        if (instance) {
+          instance.hide();
+        }
+      }
+    });
+  }
 });

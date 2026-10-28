@@ -257,7 +257,13 @@ def generate_candidate_scorecard_pdf(attempt):
         ]
     ]
 
+    has_limited_sample = False
     for t in topic_perf:
+        eval_label = t['level']
+        if t.get('is_limited_sample'):
+            eval_label = f"{t['level']}*"
+            has_limited_sample = True
+
         topic_rows.append([
             Paragraph(t['topic'], body_style),
             Paragraph(str(t['total']), body_style),
@@ -265,7 +271,7 @@ def generate_candidate_scorecard_pdf(attempt):
             Paragraph(str(t['incorrect']), body_style),
             Paragraph(str(t['unanswered']), body_style),
             Paragraph(f"{t['accuracy']}%", body_style),
-            Paragraph(t['level'], body_style),
+            Paragraph(eval_label, body_style),
         ])
 
     topic_table = Table(topic_rows, colWidths=[160, 52, 55, 60, 65, 65, 75])
@@ -278,7 +284,15 @@ def generate_candidate_scorecard_pdf(attempt):
         ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
     ]))
     story.append(topic_table)
-    story.append(Spacer(1, 14))
+
+    if has_limited_sample:
+        story.append(Spacer(1, 3))
+        story.append(Paragraph(
+            "<b>* Limited Topic Sample Notice:</b> Topics with fewer than 3 questions represent preliminary sample observations rather than definitive evidence of domain proficiency.",
+            ParagraphStyle('SampleNote', parent=styles['Normal'], fontName='Helvetica-Oblique', fontSize=7, leading=9, textColor=colors.HexColor('#64748b'))
+        ))
+
+    story.append(Spacer(1, 12))
 
     # 6. Recommendations & Improvement Areas
     story.append(Paragraph("Curated Technical Focus & Recommendations", section_heading))
@@ -290,10 +304,13 @@ def generate_candidate_scorecard_pdf(attempt):
             if s and s not in suggestions_list:
                 suggestions_list.append(f"&bull; <b>{t['topic']}</b>: {s}")
 
+    missed_count = attempt.incorrect_answers + attempt.unanswered
     if suggestions_list:
-        rec_data = [[Paragraph(s, body_style)] for s in suggestions_list[:4]]
+        rec_data = [[Paragraph(s, body_style)] for s in suggestions_list[:5]]
+    elif missed_count == 0 and attempt.score == attempt.total_questions:
+        rec_data = [[Paragraph("&bull; <b>Exemplary Mastery:</b> 100% correct answers demonstrated across all tested questions.", body_style)]]
     else:
-        rec_data = [[Paragraph("&bull; Strong understanding demonstrated across all tested competencies.", body_style)]]
+        rec_data = [[Paragraph("&bull; <b>General Assessment Review:</b> Consistent practice recommended across core topics.", body_style)]]
 
     rec_table = Table(rec_data, colWidths=[532])
     rec_table.setStyle(TableStyle([
@@ -406,15 +423,18 @@ def generate_assessment_summary_pdf(test_id):
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#1e40af'), spaceAfter=10))
 
     # 2. Test Configuration Meta
-    start_str = timezone.localtime(test.start_time).strftime('%B %d, %Y %I:%M %p') if test.start_time else "Open Schedule"
-    end_str = timezone.localtime(test.end_time).strftime('%B %d, %Y %I:%M %p') if test.end_time else "No Deadline"
+    now_local = timezone.localtime(timezone.now())
+    tz_label = now_local.strftime('%Z') or 'UTC'
+    generated_date_str = now_local.strftime('%Y-%m-%d %H:%M ') + tz_label
+    start_str = (timezone.localtime(test.start_time).strftime('%Y-%m-%d %H:%M ') + tz_label) if test.start_time else "Open Schedule"
+    end_str = (timezone.localtime(test.end_time).strftime('%Y-%m-%d %H:%M ') + tz_label) if test.end_time else "No Deadline"
 
     meta_rows = [
         [
             Paragraph("Assessment Title:", meta_label),
             Paragraph(test.test_name, meta_val),
             Paragraph("Generated Date:", meta_label),
-            Paragraph(timezone.now().strftime('%Y-%m-%d %H:%M UTC'), meta_val),
+            Paragraph(generated_date_str, meta_val),
         ],
         [
             Paragraph("Configured Duration:", meta_label),
@@ -442,29 +462,49 @@ def generate_assessment_summary_pdf(test_id):
     story.append(meta_table)
     story.append(Spacer(1, 12))
 
-    # 3. Key Cohort Metrics
+    # 3. Key Cohort Metrics & Explicit Denominator Pass Rate
     story.append(Paragraph("Executive Cohort Performance KPIs", section_heading))
     story.append(Spacer(1, 4))
+
+    finalized_n = summary['finalized_count']
+    passed_n = summary['passed']
+    total_reg = summary['total_registered']
+
+    if finalized_n == 0:
+        pass_rate_cell = "N/A (0 Finalized)"
+        pass_note = f"Pass rate is N/A because 0 of {total_reg} registered candidate(s) have finalized an attempt."
+    elif finalized_n == 1:
+        pass_rate_cell = f"{passed_n} of 1 ({summary['pass_rate']}%)*"
+        pass_note = (
+            f"*Sample Size Notice: The {summary['pass_rate']}% pass rate represents exactly 1 finalized candidate "
+            f"out of {total_reg} total registered in this cohort (a sample of N=1). It does not reflect cohort-wide completion."
+        )
+    else:
+        pass_rate_cell = f"{passed_n} of {finalized_n} ({summary['pass_rate']}%)"
+        pass_note = f"Pass rate denominator: {finalized_n} finalized examinees across {total_reg} registered candidates ({passed_n} passed, {summary['failed']} failed)."
+
+    median_display = str(summary['median_score']) if finalized_n > 0 else "N/A"
+    avg_display = f"{summary['avg_score']} ({summary['avg_percentage']}%)" if finalized_n > 0 else "N/A"
 
     kpi_rows = [
         [
             Paragraph("Total Registered", tbl_hdr),
-            Paragraph("Started / In-Progress", tbl_hdr),
+            Paragraph("Started / Active", tbl_hdr),
             Paragraph("Finalized Examinees", tbl_hdr),
-            Paragraph("Overall Pass Rate", tbl_hdr),
+            Paragraph("Pass Rate (Finalized)", tbl_hdr),
             Paragraph("Average Score", tbl_hdr),
             Paragraph("Median Score", tbl_hdr),
         ],
         [
-            Paragraph(str(summary['total_registered']), tbl_hdr),
+            Paragraph(str(total_reg), tbl_hdr),
             Paragraph(f"{summary['started']} ({summary['in_progress']} active)", tbl_hdr),
-            Paragraph(f"{summary['finalized_count']} ({summary['completed']} manual / {summary['expired']} timeout)", tbl_hdr),
-            Paragraph(f"{summary['pass_rate']}%", tbl_hdr),
-            Paragraph(f"{summary['avg_score']} ({summary['avg_percentage']}%)", tbl_hdr),
-            Paragraph(str(summary['median_score']), tbl_hdr),
+            Paragraph(f"{finalized_n} ({summary['completed']} manual / {summary['expired']} timeout)", tbl_hdr),
+            Paragraph(pass_rate_cell, tbl_hdr),
+            Paragraph(avg_display, tbl_hdr),
+            Paragraph(median_display, tbl_hdr),
         ]
     ]
-    kpi_table = Table(kpi_rows, colWidths=[80, 95, 107, 85, 85, 80])
+    kpi_table = Table(kpi_rows, colWidths=[80, 90, 102, 100, 85, 75])
     kpi_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -476,11 +516,32 @@ def generate_assessment_summary_pdf(test_id):
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
     ]))
     story.append(kpi_table)
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 3))
+    story.append(Paragraph(f"<b>Statistical Clarification:</b> {pass_note}", ParagraphStyle('PassNote', parent=styles['Normal'], fontName='Helvetica', fontSize=7, leading=9, textColor=colors.HexColor('#475569'))))
+    story.append(Spacer(1, 10))
 
-    # 4. Score Distribution Breakdown Table
-    story.append(Paragraph("Score Distribution &amp; Cohort Segmentation", section_heading))
+    # 4. Score Distribution & Cohort Statistics Table
+    story.append(Paragraph("Score Distribution &amp; Cohort Statistics", section_heading))
     story.append(Spacer(1, 4))
+
+    # Cohort statistics callout bar
+    if finalized_n == 0:
+        stats_line = "<b>Cohort Statistics (Finalized N=0):</b> Minimum: N/A | Maximum: N/A | Median: N/A | Standard Deviation: N/A (No finalized attempts recorded)"
+    elif finalized_n == 1:
+        stats_line = f"<b>Cohort Statistics (Finalized N=1):</b> Minimum: {summary['min_score']} pts | Maximum: {summary['max_score']} pts | Median: {summary['median_score']} pts | Standard Deviation: N/A (Single-candidate sample)"
+    else:
+        stats_line = f"<b>Cohort Statistics (Finalized N={finalized_n}):</b> Minimum: {summary['min_score']} pts | Maximum: {summary['max_score']} pts | Median: {summary['median_score']} pts | Standard Deviation: &plusmn;{summary['std_dev_score']} pts"
+
+    stats_bar = Table([[Paragraph(stats_line, body_style)]], colWidths=[532])
+    stats_bar.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(stats_bar)
+    story.append(Spacer(1, 6))
 
     dist_rows = [
         [
@@ -490,15 +551,22 @@ def generate_assessment_summary_pdf(test_id):
             Paragraph("Standard Score Range Reference", tbl_hdr),
         ]
     ]
+    bracket_notes = {
+        'Excellent (90–100%)': 'Score &ge; 90.0% of maximum marks',
+        'Proficient (75–89%)': '75.0% &le; Score &lt; 90.0% of maximum marks',
+        'Average (50–74%)': '50.0% &le; Score &lt; 75.0% of maximum marks',
+        'Below Standard (<50%)': 'Score &lt; 50.0% of maximum marks',
+    }
     for bucket in summary.get('distribution_buckets', []):
+        ref_text = bracket_notes.get(bucket['label'], 'Standard performance bracket')
         dist_rows.append([
             Paragraph(bucket['label'], body_bold),
             Paragraph(str(bucket['count']), tbl_hdr),
             Paragraph(f"{bucket['pct']}%", tbl_hdr),
-            Paragraph(f"Min: {summary['min_score']} | Max: {summary['max_score']} | Std Dev: &plusmn;{summary['std_dev_score']}", body_style),
+            Paragraph(ref_text, body_style),
         ])
 
-    dist_table = Table(dist_rows, colWidths=[150, 100, 132, 150])
+    dist_table = Table(dist_rows, colWidths=[150, 95, 137, 150])
     dist_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f1f5f9')),
         ('BOX', (0, 0), (-1, -1), 0.75, colors.HexColor('#cbd5e1')),
@@ -520,19 +588,27 @@ def generate_assessment_summary_pdf(test_id):
             Paragraph("Bank Questions", tbl_hdr),
             Paragraph("Appearances", tbl_hdr),
             Paragraph("Correct Answers", tbl_hdr),
-            Paragraph("Accuracy Rate (%)", tbl_hdr),
+            Paragraph("Accuracy Rate", tbl_hdr),
             Paragraph("Proficiency Classification", tbl_hdr),
         ]
     ]
     topics = summary.get('topic_breakdown', [])
+    has_unattempted_topic = False
     if topics:
         for t in topics:
+            assigned = t.get('assigned_count', 0)
+            if assigned > 0:
+                acc_text = f"{t['accuracy']}%"
+            else:
+                acc_text = "&mdash;"
+                has_unattempted_topic = True
+
             topic_rows.append([
                 Paragraph(t['topic'], body_bold),
                 Paragraph(str(t['question_bank_count']), tbl_hdr),
-                Paragraph(str(t['assigned_count']), tbl_hdr),
+                Paragraph(str(assigned), tbl_hdr),
                 Paragraph(str(t['correct_count']), tbl_hdr),
-                Paragraph(f"{t['accuracy']}%", tbl_hdr),
+                Paragraph(acc_text, tbl_hdr),
                 Paragraph(t['level'], tbl_hdr),
             ])
     else:
@@ -552,7 +628,13 @@ def generate_assessment_summary_pdf(test_id):
         ('LEFTPADDING', (0, 0), (-1, -1), 6),
     ]))
     story.append(topic_table)
-    story.append(Spacer(1, 16))
+    if has_unattempted_topic:
+        story.append(Spacer(1, 2))
+        story.append(Paragraph(
+            "<b>* Note on Topic Accuracy:</b> An em dash (&mdash;) signifies that no questions for this topic have been attempted yet (retaining the 'No Data' classification).",
+            ParagraphStyle('TopicNote', parent=styles['Normal'], fontName='Helvetica-Oblique', fontSize=7, leading=9, textColor=colors.HexColor('#64748b'))
+        ))
+    story.append(Spacer(1, 14))
 
     # 6. Verification and Mandatory 2-Line Footer
     story.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#cbd5e1'), spaceAfter=8))
