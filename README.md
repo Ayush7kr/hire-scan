@@ -5,7 +5,7 @@
 [![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white)](https://getbootstrap.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-187%20Passed%20(100%25)-success?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/Ayush7kr/hire-scan)
+[![Tests](https://img.shields.io/badge/Tests-199%20Passed%20(100%25)-success?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/Ayush7kr/hire-scan)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 HireScan is a secure, high-performance, enterprise-grade technical assessment and test management tool. Engineered with Django and Python, HireScan automates candidate onboarding, conducts timed, randomized examinations with zero answer leakage, and delivers executive psychometric and competency analytics.
@@ -23,12 +23,12 @@ HireScan includes an eye-friendly, high-contrast theme system with a centralized
 
 ---
 
-### Core User Experiences
+### Core User Experiences & Passwordless Authentication
 
-| Candidate Passwordless OTP Sign-In | Administrator Secure Sign-In |
-| :---: | :---: |
-| ![Candidate OTP Login](docs/screenshots/03_candidate_login.png) | ![Admin Login](docs/screenshots/04_admin_login.png) |
-| *Cryptographic 6-digit email OTP with PBKDF2 hashing, 5-minute TTL, responsive HTML template & anti-enumeration.* | *Dedicated, isolated admin gateway with CSRF defense, session protection, and role-based access.* |
+| Candidate Passwordless OTP Sign-In | Branded OTP Email Delivery (Inbox) | Administrator Secure Sign-In |
+| :---: | :---: | :---: |
+| ![Candidate OTP Login](docs/screenshots/03_candidate_login.png) | ![Candidate OTP Email Delivery](docs/screenshots/03b_candidate_otp_email.png) | ![Admin Login](docs/screenshots/04_admin_login.png) |
+| *Cryptographic 6-digit email OTP with PBKDF2 hashing, 5-minute TTL, and anti-enumeration.* | *Verified responsive HTML email template delivered directly to candidate inbox with high-visibility code display.* | *Dedicated, isolated admin gateway with CSRF defense, session protection, and role-based access.* |
 
 ---
 
@@ -96,6 +96,7 @@ Dive deeper into every facet of HireScan with our dedicated guides:
 - 🏛️ **[System Architecture & Technical Specifications](docs/ARCHITECTURE.md)**: Deep dive into the modular architecture, Entity Relationship (ER) diagrams, transaction isolation, state machine, and database indexes.
 - 🔒 **[Security Architecture & Threat Model](docs/SECURITY.md)**: Details on PBKDF2 OTP hashing, Zero-Answer-Leak design, anti-enumeration, session security, and HTTP security headers.
 - 🚀 **[Production Deployment & Operations Guide](docs/DEPLOYMENT_GUIDE.md)**: Step-by-step instructions for Docker, Docker Compose, PostgreSQL 16, Gunicorn WSGI, WhiteNoise, backups, and CI/CD.
+- ⚡ **[Advanced & Additional Features Specification](docs/ADDITIONAL_FEATURES.md)**: Comprehensive manual detailing responsive off-canvas navigation, high-capacity bulk registration with conflict isolation, cohort PDF analytics with statistical sample safeguards, curated topic recommendation engine, and resilient CSV validation.
 
 ---
 
@@ -121,8 +122,12 @@ Dive deeper into every facet of HireScan with our dedicated guides:
   - Preserves search and filter parameters across pagination via URL query string encoding.
 - **Professional Branded OTP Email System:**
   - Clean, responsive HTML email template with HireScan branding, high-visibility OTP display box, local expiry notice, and security warnings.
+  - Verified cross-client delivery (Gmail, Outlook, Apple Mail) featuring responsive typography and mobile-friendly layout.
   - Full plain-text fallback for maximum client compatibility.
   - Strict confidentiality: OTPs are never exposed in application logs or client payloads.
+- **Responsive Multi-Device Off-Canvas Navigation:**
+  - Persistent left-sidebar navigation on desktop viewports (>= 992px) with seamless auto-collapse into an off-canvas drawer on smaller screens or docked browser DevTools.
+  - Non-intrusive backdrop dismissal, Escape-key keyboard listener, and auto-dismissal upon navigation link selection without page flow disruption.
 - **Zero-Answer-Leak Architecture:** Correct answers are **never** delivered to client browsers during assessments. Scoring occurs strictly server-side within atomic database transactions.
 - **Resilient Assessment Engine:**
   - Automated question randomization and stable per-attempt ordering.
